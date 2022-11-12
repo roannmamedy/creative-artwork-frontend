@@ -187,9 +187,9 @@ customElements.define('va-app-header', class AppHeader extends LitElement {
         ${this.user.accessLevel == 2  ? html`
         <a href="/newArtwork" @click="${anchorRoute}">Add Artwork</a> 
         `:html`` }
-        <a href="/myLibrary"> <sl-icon slot="prefix" name="basket"></sl-icon> Cart</a>
-        <a href="/artworks"> <sl-icon slot="prefix" name="brush"></sl-icon> Artworks</a>  
-        <a href="/guide"> <sl-icon slot="prefix" name="book"></sl-icon> Guide</a>  
+        <a href="/myLibrary" @click="${anchorRoute}"> <sl-icon slot="prefix" name="basket"></sl-icon> Cart</a>
+        <a href="/artworks" @click="${anchorRoute}"> <sl-icon slot="prefix" name="brush"></sl-icon> Artworks</a>  
+        <a href="/guide" @click="${anchorRoute}"> <sl-icon slot="prefix" name="book"></sl-icon> Guide</a>  
 
         <sl-dropdown>
           <a slot="trigger" href="#" @click="${(e) => e.preventDefault()}">

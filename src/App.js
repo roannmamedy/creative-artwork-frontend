@@ -7,7 +7,7 @@ class App {
   constructor(){
     this.name = "Creative Artwork"
     this.version = "1.0.0"
-    this.apiBase = 'https://rm-creative-artwork-backend.herokuapp.com'
+    this.apiBase = 'https://rm-creative-artwork-backend.herokuapp.com/'
     this.rootEl = document.getElementById("root")
     this.version = "1.0.0"
   }

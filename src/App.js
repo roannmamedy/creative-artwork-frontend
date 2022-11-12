@@ -5,7 +5,7 @@ import Toast from './Toast'
 
 class App {
   constructor(){
-    this.name = "Dbook"
+    this.name = "Creative Artwork"
     this.version = "1.0.0"
     this.apiBase = 'http://localhost:3000'
     this.rootEl = document.getElementById("root")

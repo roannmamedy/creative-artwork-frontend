@@ -29,24 +29,33 @@ class GuideView {
       <div class="page-content calign">        
         
         <h2 class="brand-color">Welcome ${Auth.currentUser.firstName}!</h2>
-        <p>This is a quick tour to teach you the basics of using Dbook in the most effective way</p>
+        <p>This is a quick tour to teach you the basics of using Creative Artwork in the most effective way</p>
         
         <div class="guide-step">
-          <h4>Find a Book with the Filter</h4>
-          <img src="/images/findFilter.jpg">
+          <h4>Find an Artwork with the Filter</h4>
+          <img src="/images/filter.png">
         </div>
         
         <div class="guide-step">
-          <h4>Access or modify your Profil</h4>
-          <img src="/images/accessProfil.jpg">
+          <h4>Add an artwork to your Cart</h4>
+          <img src="/images/tocart.png">
         </div>
         
         <div class="guide-step">
-          <h4>Add a book to you Library or Read a summary</h4>
-          <img src="/images/addLibrary.jpg">
+          <h4>Go to your Cart</h4>
+          <img src="/images/acart.png">
         </div>
 
+        <div class="guide-step">
+          <h4>Sell your Artworks</h4>
+          <img src="/images/sell.png">
+        </div>
         
+        <div class="guide-step">
+          <h4>Buy Artworks</h4>
+          <img src="/images/buy.png">
+        </div>
+
         <sl-button type="primary" @click=${() => gotoRoute('/')}>Okay got it!</sl-button>
         
       </div>      

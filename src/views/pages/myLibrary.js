@@ -26,35 +26,43 @@ async getMyLibrary(){
   }catch(err){
     Toast.show(err, 'error')
   }
+
 }
+
+
 
   render(){
     const template = html`
       <va-app-header title="My Library" user="${JSON.stringify(Auth.currentUser)}"></va-app-header>
-      <div class="page-content">        
-        <h1>My Library</h1>
-        <div class="books-grid">
+      <div class="page-content">   
+      <div class="bn">     
+        <h1>Cart</h1>
+      </div>
+        <div class="artworks-grid">
         ${this.myLibrary == null ? html`
         <sl-spinner></sl-spinner>
         ` : html`
-          ${this.myLibrary.map(book => html`
-            <va-book class="book-card"
-              id="${book._id}"
-              name="${book.name}"
-              author="${book.author}"
-              description="${book.description}"
-              user="${JSON.stringify(book.user)}"
-              image="${book.image}"
-              genre="${book.genre}"
-              summary="${book.summary}"
+          ${this.myLibrary.map(artwork => html`
+            <va-artwork class="artwork-card"
+              id="${artwork._id}"
+              name="${artwork.name}"
+              author="${artwork.author}"
+              price="${artwork.price}"
+              user="${JSON.stringify(artwork.user)}"
+              image="${artwork.image}"
+              genre="${artwork.genre}"
+              summary="${artwork.summary}"
             >        
-            </va-book>
+            </va-artwork>
 
           `)}
         `}
         </div>
-        
-      </div>      
+        <div class="bn">
+      <button onclick="alert('Youre all set!');">Buy Now</button>
+</div>
+      </div> 
+
     `
     render(template, App.rootEl)
   }

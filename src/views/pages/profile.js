@@ -38,9 +38,7 @@ class ProfileView {
       </div>
       </div>    
 
-      <div class="bk-image" >
-        <img width="1000px" height= "100%" src="/images/library2.svg" page-centered alt="">
-        </div>
+
       
     `
     render(template, App.rootEl)

@@ -70,15 +70,15 @@ class UserAPI {
     // return data
     return data
   }
-    async addBookLib(bookId){
+    async addArtworkLib(artworkId){
       // validate
-      if(!bookId) return
+      if(!artworkId) return
 
       // fetch the json data
-      const response = await fetch(`${App.apiBase}/user/addBookLib`, {
+      const response = await fetch(`${App.apiBase}/user/addArtworkLib`, {
         method: "PUT",
         headers: { "Authorization": `Bearer ${localStorage.accessToken}`, "Content-Type": 'application/json'},
-        body: JSON.stringify({bookId: bookId})
+        body: JSON.stringify({artworkId: artworkId})
       })
   
       // if response not ok
@@ -87,7 +87,7 @@ class UserAPI {
         const err = await response.json()
         if(err) console.log(err)
         // throw error (exit this function)      
-        throw new Error('Problem adding book to library')
+        throw new Error('Problem adding artwork to library')
       }
       
       // convert response payload into json - store as data

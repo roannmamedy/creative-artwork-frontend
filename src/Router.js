@@ -5,10 +5,10 @@ import signinView from './views/pages/signin'
 import signupView from './views/pages/signup'
 import profileView from './views/pages/profile'
 import editProfileView from './views/pages/editProfile'
-import booksView from './views/pages/books'
+import artworksView from './views/pages/artworks'
 import myLibraryView from './views/pages/myLibrary'
 import guideView from './views/pages/guide'
-import newBookView from './views/pages/newbook'
+import newArtworkView from './views/pages/newartwork'
 
 // define routes
 const routes = {
@@ -18,10 +18,11 @@ const routes = {
 	'/signup': signupView,
 	'/profile': profileView,
 	'/myLibrary': myLibraryView,
-	'/books': booksView,
+	'/artworks': artworksView,
 	'/editProfile': editProfileView,
 	'/guide': guideView,
-	'/newBook': newBookView	
+	'/newArtwork': newArtworkView	
+	
 
 }
 

@@ -27,22 +27,57 @@ class SignInView {
   render(){    
     const template = html`      
       <div class="page-content page-centered">
-        <div class="signinup-box">
-          <img class="signinup-logo" src="/images/logo.svg">          
-          <sl-form class="form-signup dark-theme" @sl-submit=${this.signInSubmitHandler}>          
-            <div class="input-group">
-              <sl-input name="email" type="email" placeholder="Email" required></sl-input>
-            </div>
-            <div class="input-group">
-              <sl-input name="password" type="password" placeholder="Password" required toggle-password></sl-input>
-            </div>
-            <sl-button class="submit-btn" type="primary" submit style="width: 100%;">Sign In</sl-button>
-          </sl-form>
-          <p>No Account? <a href="/signup" @click=${anchorRoute}>Sign Up</a></p>
+        <div class="signinup-box">       
+         
         </div>
-        
-       
       </div>
+
+    <div class="form-container sign-in-container">
+
+      <form action="#">
+        <h1>Sign in</h1>
+
+        <sl-form class="form-signup dark-theme" @sl-submit=${this.signInSubmitHandler}>
+       <br>
+
+        <div class="input-group">
+        <sl-input name="email" type="email" placeholder="Email"></sl-input>
+        </div>
+
+        <div class="input-group">
+        <sl-input name="password" type="password" placeholder="Password" required toggle-password></sl-input>
+        </div>
+
+
+       <br>
+       <br>
+
+        <sl-button class="submit-btn" type="primary" submit style="width: 70%;">Sign In</sl-button>
+      </sl-form>
+
+    </div>
+
+
+    <div class="overlay-container">
+      <div class="overlay">
+        <div class="overlay-panel overlay-left">
+        </div>
+
+        <div class="overlay-panel overlay-right ">
+          
+          <h1>Hey There!</h1>
+          <p>Are you a designer, an artist or just passionate about the creative universe?
+            <br>You're in the right place!
+            <br>This website specialises in the selling and buying of art goodies</p>
+          <h2></h2>
+          <sl-button class="ghost" type="primary" submit style="width: 40%;" @click=${() => gotoRoute('/signup')}>Sign Up</sl-button>
+          
+        </div>
+        <img src="/images/11.png" width="100%" height=""/>
+      </div>
+    </div>
+    </div>
+
     `
     render(template, App.rootEl)    
   }

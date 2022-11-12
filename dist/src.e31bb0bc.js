@@ -199,7 +199,7 @@ exports.isDirective = isDirective;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.removeNodes = exports.reparentNodes = exports.isCEPolyfill = void 0;
+exports.reparentNodes = exports.removeNodes = exports.isCEPolyfill = void 0;
 
 /**
  * @license
@@ -291,7 +291,7 @@ exports.nothing = nothing;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.lastAttributeNameRegex = exports.createMarker = exports.isTemplatePartActive = exports.Template = exports.boundAttributeSuffix = exports.markerRegex = exports.nodeMarker = exports.marker = void 0;
+exports.nodeMarker = exports.markerRegex = exports.marker = exports.lastAttributeNameRegex = exports.isTemplatePartActive = exports.createMarker = exports.boundAttributeSuffix = exports.Template = void 0;
 
 /**
  * @license
@@ -373,144 +373,144 @@ class Template {
       if (node.nodeType === 1
       /* Node.ELEMENT_NODE */
       ) {
-          if (node.hasAttributes()) {
-            const attributes = node.attributes;
-            const {
-              length
-            } = attributes; // Per
-            // https://developer.mozilla.org/en-US/docs/Web/API/NamedNodeMap,
-            // attributes are not guaranteed to be returned in document order.
-            // In particular, Edge/IE can return them out of order, so we cannot
-            // assume a correspondence between part index and attribute index.
+        if (node.hasAttributes()) {
+          const attributes = node.attributes;
+          const {
+            length
+          } = attributes; // Per
+          // https://developer.mozilla.org/en-US/docs/Web/API/NamedNodeMap,
+          // attributes are not guaranteed to be returned in document order.
+          // In particular, Edge/IE can return them out of order, so we cannot
+          // assume a correspondence between part index and attribute index.
 
-            let count = 0;
+          let count = 0;
 
-            for (let i = 0; i < length; i++) {
-              if (endsWith(attributes[i].name, boundAttributeSuffix)) {
-                count++;
-              }
-            }
-
-            while (count-- > 0) {
-              // Get the template literal section leading up to the first
-              // expression in this attribute
-              const stringForPart = strings[partIndex]; // Find the attribute name
-
-              const name = lastAttributeNameRegex.exec(stringForPart)[2]; // Find the corresponding attribute
-              // All bound attributes have had a suffix added in
-              // TemplateResult#getHTML to opt out of special attribute
-              // handling. To look up the attribute value we also need to add
-              // the suffix.
-
-              const attributeLookupName = name.toLowerCase() + boundAttributeSuffix;
-              const attributeValue = node.getAttribute(attributeLookupName);
-              node.removeAttribute(attributeLookupName);
-              const statics = attributeValue.split(markerRegex);
-              this.parts.push({
-                type: 'attribute',
-                index,
-                name,
-                strings: statics
-              });
-              partIndex += statics.length - 1;
+          for (let i = 0; i < length; i++) {
+            if (endsWith(attributes[i].name, boundAttributeSuffix)) {
+              count++;
             }
           }
 
-          if (node.tagName === 'TEMPLATE') {
-            stack.push(node);
-            walker.currentNode = node.content;
-          }
-        } else if (node.nodeType === 3
-      /* Node.TEXT_NODE */
-      ) {
-          const data = node.data;
+          while (count-- > 0) {
+            // Get the template literal section leading up to the first
+            // expression in this attribute
+            const stringForPart = strings[partIndex]; // Find the attribute name
 
-          if (data.indexOf(marker) >= 0) {
-            const parent = node.parentNode;
-            const strings = data.split(markerRegex);
-            const lastIndex = strings.length - 1; // Generate a new text node for each literal section
-            // These nodes are also used as the markers for node parts
+            const name = lastAttributeNameRegex.exec(stringForPart)[2]; // Find the corresponding attribute
+            // All bound attributes have had a suffix added in
+            // TemplateResult#getHTML to opt out of special attribute
+            // handling. To look up the attribute value we also need to add
+            // the suffix.
 
-            for (let i = 0; i < lastIndex; i++) {
-              let insert;
-              let s = strings[i];
-
-              if (s === '') {
-                insert = createMarker();
-              } else {
-                const match = lastAttributeNameRegex.exec(s);
-
-                if (match !== null && endsWith(match[2], boundAttributeSuffix)) {
-                  s = s.slice(0, match.index) + match[1] + match[2].slice(0, -boundAttributeSuffix.length) + match[3];
-                }
-
-                insert = document.createTextNode(s);
-              }
-
-              parent.insertBefore(insert, node);
-              this.parts.push({
-                type: 'node',
-                index: ++index
-              });
-            } // If there's no text, we must insert a comment to mark our place.
-            // Else, we can trust it will stick around after cloning.
-
-
-            if (strings[lastIndex] === '') {
-              parent.insertBefore(createMarker(), node);
-              nodesToRemove.push(node);
-            } else {
-              node.data = strings[lastIndex];
-            } // We have a part for each match found
-
-
-            partIndex += lastIndex;
-          }
-        } else if (node.nodeType === 8
-      /* Node.COMMENT_NODE */
-      ) {
-          if (node.data === marker) {
-            const parent = node.parentNode; // Add a new marker node to be the startNode of the Part if any of
-            // the following are true:
-            //  * We don't have a previousSibling
-            //  * The previousSibling is already the start of a previous part
-
-            if (node.previousSibling === null || index === lastPartIndex) {
-              index++;
-              parent.insertBefore(createMarker(), node);
-            }
-
-            lastPartIndex = index;
+            const attributeLookupName = name.toLowerCase() + boundAttributeSuffix;
+            const attributeValue = node.getAttribute(attributeLookupName);
+            node.removeAttribute(attributeLookupName);
+            const statics = attributeValue.split(markerRegex);
             this.parts.push({
-              type: 'node',
-              index
-            }); // If we don't have a nextSibling, keep this node so we have an end.
-            // Else, we can remove it to save future costs.
-
-            if (node.nextSibling === null) {
-              node.data = '';
-            } else {
-              nodesToRemove.push(node);
-              index--;
-            }
-
-            partIndex++;
-          } else {
-            let i = -1;
-
-            while ((i = node.data.indexOf(marker, i + 1)) !== -1) {
-              // Comment node has a binding marker inside, make an inactive part
-              // The binding won't work, but subsequent bindings will
-              // TODO (justinfagnani): consider whether it's even worth it to
-              // make bindings in comments work
-              this.parts.push({
-                type: 'node',
-                index: -1
-              });
-              partIndex++;
-            }
+              type: 'attribute',
+              index,
+              name,
+              strings: statics
+            });
+            partIndex += statics.length - 1;
           }
         }
+
+        if (node.tagName === 'TEMPLATE') {
+          stack.push(node);
+          walker.currentNode = node.content;
+        }
+      } else if (node.nodeType === 3
+      /* Node.TEXT_NODE */
+      ) {
+        const data = node.data;
+
+        if (data.indexOf(marker) >= 0) {
+          const parent = node.parentNode;
+          const strings = data.split(markerRegex);
+          const lastIndex = strings.length - 1; // Generate a new text node for each literal section
+          // These nodes are also used as the markers for node parts
+
+          for (let i = 0; i < lastIndex; i++) {
+            let insert;
+            let s = strings[i];
+
+            if (s === '') {
+              insert = createMarker();
+            } else {
+              const match = lastAttributeNameRegex.exec(s);
+
+              if (match !== null && endsWith(match[2], boundAttributeSuffix)) {
+                s = s.slice(0, match.index) + match[1] + match[2].slice(0, -boundAttributeSuffix.length) + match[3];
+              }
+
+              insert = document.createTextNode(s);
+            }
+
+            parent.insertBefore(insert, node);
+            this.parts.push({
+              type: 'node',
+              index: ++index
+            });
+          } // If there's no text, we must insert a comment to mark our place.
+          // Else, we can trust it will stick around after cloning.
+
+
+          if (strings[lastIndex] === '') {
+            parent.insertBefore(createMarker(), node);
+            nodesToRemove.push(node);
+          } else {
+            node.data = strings[lastIndex];
+          } // We have a part for each match found
+
+
+          partIndex += lastIndex;
+        }
+      } else if (node.nodeType === 8
+      /* Node.COMMENT_NODE */
+      ) {
+        if (node.data === marker) {
+          const parent = node.parentNode; // Add a new marker node to be the startNode of the Part if any of
+          // the following are true:
+          //  * We don't have a previousSibling
+          //  * The previousSibling is already the start of a previous part
+
+          if (node.previousSibling === null || index === lastPartIndex) {
+            index++;
+            parent.insertBefore(createMarker(), node);
+          }
+
+          lastPartIndex = index;
+          this.parts.push({
+            type: 'node',
+            index
+          }); // If we don't have a nextSibling, keep this node so we have an end.
+          // Else, we can remove it to save future costs.
+
+          if (node.nextSibling === null) {
+            node.data = '';
+          } else {
+            nodesToRemove.push(node);
+            index--;
+          }
+
+          partIndex++;
+        } else {
+          let i = -1;
+
+          while ((i = node.data.indexOf(marker, i + 1)) !== -1) {
+            // Comment node has a binding marker inside, make an inactive part
+            // The binding won't work, but subsequent bindings will
+            // TODO (justinfagnani): consider whether it's even worth it to
+            // make bindings in comments work
+            this.parts.push({
+              type: 'node',
+              index: -1
+            });
+            partIndex++;
+          }
+        }
+      }
     } // Remove text binding nodes after the walk to not disturb the TreeWalker
 
 
@@ -734,7 +734,7 @@ exports.TemplateInstance = TemplateInstance;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.SVGTemplateResult = exports.TemplateResult = void 0;
+exports.TemplateResult = exports.SVGTemplateResult = void 0;
 
 var _dom = require("./dom.js");
 
@@ -891,7 +891,7 @@ exports.SVGTemplateResult = SVGTemplateResult;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.EventPart = exports.PropertyPart = exports.PropertyCommitter = exports.BooleanAttributePart = exports.NodePart = exports.AttributePart = exports.AttributeCommitter = exports.isIterable = exports.isPrimitive = void 0;
+exports.isPrimitive = exports.isIterable = exports.PropertyPart = exports.PropertyCommitter = exports.NodePart = exports.EventPart = exports.BooleanAttributePart = exports.AttributePart = exports.AttributeCommitter = void 0;
 
 var _directive = require("./directive.js");
 
@@ -1192,11 +1192,11 @@ class NodePart {
     if (node === this.endNode.previousSibling && node.nodeType === 3
     /* Node.TEXT_NODE */
     ) {
-        // If we only have a single text node between the markers, we can just
-        // set its value, rather than replacing it.
-        // TODO(justinfagnani): Can we just check if this.value is primitive?
-        node.data = valueAsString;
-      } else {
+      // If we only have a single text node between the markers, we can just
+      // set its value, rather than replacing it.
+      // TODO(justinfagnani): Can we just check if this.value is primitive?
+      node.data = valueAsString;
+    } else {
       this.__commitNode(document.createTextNode(valueAsString));
     }
 
@@ -1545,8 +1545,8 @@ exports.defaultTemplateProcessor = defaultTemplateProcessor;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.templateFactory = templateFactory;
 exports.templateCaches = void 0;
+exports.templateFactory = templateFactory;
 
 var _template = require("./template.js");
 
@@ -1673,66 +1673,6 @@ exports.render = render;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-Object.defineProperty(exports, "DefaultTemplateProcessor", {
-  enumerable: true,
-  get: function () {
-    return _defaultTemplateProcessor.DefaultTemplateProcessor;
-  }
-});
-Object.defineProperty(exports, "defaultTemplateProcessor", {
-  enumerable: true,
-  get: function () {
-    return _defaultTemplateProcessor.defaultTemplateProcessor;
-  }
-});
-Object.defineProperty(exports, "SVGTemplateResult", {
-  enumerable: true,
-  get: function () {
-    return _templateResult.SVGTemplateResult;
-  }
-});
-Object.defineProperty(exports, "TemplateResult", {
-  enumerable: true,
-  get: function () {
-    return _templateResult.TemplateResult;
-  }
-});
-Object.defineProperty(exports, "directive", {
-  enumerable: true,
-  get: function () {
-    return _directive.directive;
-  }
-});
-Object.defineProperty(exports, "isDirective", {
-  enumerable: true,
-  get: function () {
-    return _directive.isDirective;
-  }
-});
-Object.defineProperty(exports, "removeNodes", {
-  enumerable: true,
-  get: function () {
-    return _dom.removeNodes;
-  }
-});
-Object.defineProperty(exports, "reparentNodes", {
-  enumerable: true,
-  get: function () {
-    return _dom.reparentNodes;
-  }
-});
-Object.defineProperty(exports, "noChange", {
-  enumerable: true,
-  get: function () {
-    return _part.noChange;
-  }
-});
-Object.defineProperty(exports, "nothing", {
-  enumerable: true,
-  get: function () {
-    return _part.nothing;
-  }
-});
 Object.defineProperty(exports, "AttributeCommitter", {
   enumerable: true,
   get: function () {
@@ -1751,22 +1691,16 @@ Object.defineProperty(exports, "BooleanAttributePart", {
     return _parts.BooleanAttributePart;
   }
 });
+Object.defineProperty(exports, "DefaultTemplateProcessor", {
+  enumerable: true,
+  get: function () {
+    return _defaultTemplateProcessor.DefaultTemplateProcessor;
+  }
+});
 Object.defineProperty(exports, "EventPart", {
   enumerable: true,
   get: function () {
     return _parts.EventPart;
-  }
-});
-Object.defineProperty(exports, "isIterable", {
-  enumerable: true,
-  get: function () {
-    return _parts.isIterable;
-  }
-});
-Object.defineProperty(exports, "isPrimitive", {
-  enumerable: true,
-  get: function () {
-    return _parts.isPrimitive;
   }
 });
 Object.defineProperty(exports, "NodePart", {
@@ -1787,10 +1721,95 @@ Object.defineProperty(exports, "PropertyPart", {
     return _parts.PropertyPart;
   }
 });
+Object.defineProperty(exports, "SVGTemplateResult", {
+  enumerable: true,
+  get: function () {
+    return _templateResult.SVGTemplateResult;
+  }
+});
+Object.defineProperty(exports, "Template", {
+  enumerable: true,
+  get: function () {
+    return _template.Template;
+  }
+});
+Object.defineProperty(exports, "TemplateInstance", {
+  enumerable: true,
+  get: function () {
+    return _templateInstance.TemplateInstance;
+  }
+});
+Object.defineProperty(exports, "TemplateResult", {
+  enumerable: true,
+  get: function () {
+    return _templateResult.TemplateResult;
+  }
+});
+Object.defineProperty(exports, "createMarker", {
+  enumerable: true,
+  get: function () {
+    return _template.createMarker;
+  }
+});
+Object.defineProperty(exports, "defaultTemplateProcessor", {
+  enumerable: true,
+  get: function () {
+    return _defaultTemplateProcessor.defaultTemplateProcessor;
+  }
+});
+Object.defineProperty(exports, "directive", {
+  enumerable: true,
+  get: function () {
+    return _directive.directive;
+  }
+});
+exports.html = void 0;
+Object.defineProperty(exports, "isDirective", {
+  enumerable: true,
+  get: function () {
+    return _directive.isDirective;
+  }
+});
+Object.defineProperty(exports, "isIterable", {
+  enumerable: true,
+  get: function () {
+    return _parts.isIterable;
+  }
+});
+Object.defineProperty(exports, "isPrimitive", {
+  enumerable: true,
+  get: function () {
+    return _parts.isPrimitive;
+  }
+});
+Object.defineProperty(exports, "isTemplatePartActive", {
+  enumerable: true,
+  get: function () {
+    return _template.isTemplatePartActive;
+  }
+});
+Object.defineProperty(exports, "noChange", {
+  enumerable: true,
+  get: function () {
+    return _part.noChange;
+  }
+});
+Object.defineProperty(exports, "nothing", {
+  enumerable: true,
+  get: function () {
+    return _part.nothing;
+  }
+});
 Object.defineProperty(exports, "parts", {
   enumerable: true,
   get: function () {
     return _render.parts;
+  }
+});
+Object.defineProperty(exports, "removeNodes", {
+  enumerable: true,
+  get: function () {
+    return _dom.removeNodes;
   }
 });
 Object.defineProperty(exports, "render", {
@@ -1799,6 +1818,13 @@ Object.defineProperty(exports, "render", {
     return _render.render;
   }
 });
+Object.defineProperty(exports, "reparentNodes", {
+  enumerable: true,
+  get: function () {
+    return _dom.reparentNodes;
+  }
+});
+exports.svg = void 0;
 Object.defineProperty(exports, "templateCaches", {
   enumerable: true,
   get: function () {
@@ -1811,31 +1837,6 @@ Object.defineProperty(exports, "templateFactory", {
     return _templateFactory.templateFactory;
   }
 });
-Object.defineProperty(exports, "TemplateInstance", {
-  enumerable: true,
-  get: function () {
-    return _templateInstance.TemplateInstance;
-  }
-});
-Object.defineProperty(exports, "createMarker", {
-  enumerable: true,
-  get: function () {
-    return _template.createMarker;
-  }
-});
-Object.defineProperty(exports, "isTemplatePartActive", {
-  enumerable: true,
-  get: function () {
-    return _template.isTemplatePartActive;
-  }
-});
-Object.defineProperty(exports, "Template", {
-  enumerable: true,
-  get: function () {
-    return _template.Template;
-  }
-});
-exports.svg = exports.html = void 0;
 
 var _defaultTemplateProcessor = require("./lib/default-template-processor.js");
 
@@ -1893,7 +1894,7 @@ var _template = require("./lib/template.js");
 // This line will be used in regexes to search for lit-html usage.
 // TODO(justinfagnani): inject version number at build time
 if (typeof window !== 'undefined') {
-  (window['litHtmlVersions'] || (window['litHtmlVersions'] = [])).push('1.3.0');
+  (window['litHtmlVersions'] || (window['litHtmlVersions'] = [])).push('1.4.1');
 }
 /**
  * Interprets a template literal as an HTML template that can efficiently
@@ -1923,19 +1924,11 @@ exports.default = void 0;
 
 var _litHtml = require("lit-html");
 
-function _templateObject() {
-  const data = _taggedTemplateLiteral(["\n\n  <div class=\"app-splash\">\n    <div class=\"inner\">\n      <img class=\"app-logo\" src=\"/images/logo.svg\" />\n      <sl-spinner style=\"font-size: 2em;\"></sl-spinner>\n    </div>\n  </div>\n"]);
-
-  _templateObject = function _templateObject() {
-    return data;
-  };
-
-  return data;
-}
+var _templateObject;
 
 function _taggedTemplateLiteral(strings, raw) { if (!raw) { raw = strings.slice(0); } return Object.freeze(Object.defineProperties(strings, { raw: { value: Object.freeze(raw) } })); }
 
-const splash = (0, _litHtml.html)(_templateObject());
+const splash = (0, _litHtml.html)(_templateObject || (_templateObject = _taggedTemplateLiteral(["\n\n  <div class=\"app-splash\">\n    <div class=\"inner\">\n      <img class=\"app-logo\" src=\"/images/logoblack.png\" />\n      <sl-spinner style=\"font-size: 2em;\"></sl-spinner>\n    </div>\n  </div>\n"])));
 var _default = splash;
 exports.default = _default;
 },{"lit-html":"../node_modules/lit-html/lit-html.js"}],"../node_modules/gsap/gsap-core.js":[function(require,module,exports) {
@@ -1944,7 +1937,7 @@ exports.default = _default;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports._getCache = exports._getSetter = exports._missingPlugin = exports._round = exports._roundModifier = exports._config = exports._ticker = exports._plugins = exports._checkPlugin = exports._replaceRandom = exports._colorStringFilter = exports._sortPropTweensByPriority = exports._forEachName = exports._removeLinkedListItem = exports._setDefaults = exports._relExp = exports._renderComplexString = exports._isUndefined = exports._isString = exports._numWithUnitExp = exports._numExp = exports._getProperty = exports.shuffle = exports.interpolate = exports.unitize = exports.pipe = exports.mapRange = exports.toArray = exports.splitColor = exports.clamp = exports.getUnit = exports.normalize = exports.snap = exports.random = exports.distribute = exports.wrapYoyo = exports.wrap = exports.Circ = exports.Expo = exports.Sine = exports.Bounce = exports.SteppedEase = exports.Back = exports.Elastic = exports.Strong = exports.Quint = exports.Quart = exports.Cubic = exports.Quad = exports.Linear = exports.Power4 = exports.Power3 = exports.Power2 = exports.Power1 = exports.Power0 = exports.default = exports.gsap = exports.PropTween = exports.TweenLite = exports.TweenMax = exports.Tween = exports.TimelineLite = exports.TimelineMax = exports.Timeline = exports.Animation = exports.GSCache = void 0;
+exports.wrapYoyo = exports.wrap = exports.unitize = exports.toArray = exports.splitColor = exports.snap = exports.shuffle = exports.selector = exports.random = exports.pipe = exports.normalize = exports.mapRange = exports.interpolate = exports.gsap = exports.getUnit = exports.distribute = exports.default = exports.clamp = exports._ticker = exports._sortPropTweensByPriority = exports._setDefaults = exports._roundModifier = exports._round = exports._replaceRandom = exports._renderComplexString = exports._removeLinkedListItem = exports._relExp = exports._plugins = exports._parseRelative = exports._numWithUnitExp = exports._numExp = exports._missingPlugin = exports._isUndefined = exports._isString = exports._getSetter = exports._getProperty = exports._getCache = exports._forEachName = exports._config = exports._colorStringFilter = exports._colorExp = exports._checkPlugin = exports.TweenMax = exports.TweenLite = exports.Tween = exports.TimelineMax = exports.TimelineLite = exports.Timeline = exports.Strong = exports.SteppedEase = exports.Sine = exports.Quint = exports.Quart = exports.Quad = exports.PropTween = exports.Power4 = exports.Power3 = exports.Power2 = exports.Power1 = exports.Power0 = exports.Linear = exports.GSCache = exports.Expo = exports.Elastic = exports.Cubic = exports.Circ = exports.Bounce = exports.Back = exports.Animation = void 0;
 
 function _assertThisInitialized(self) {
   if (self === void 0) {
@@ -1960,10 +1953,10 @@ function _inheritsLoose(subClass, superClass) {
   subClass.__proto__ = superClass;
 }
 /*!
- * GSAP 3.6.0
+ * GSAP 3.11.1
  * https://greensock.com
  *
- * @license Copyright 2008-2021, GreenSock. All rights reserved.
+ * @license Copyright 2008-2022, GreenSock. All rights reserved.
  * Subject to the terms at https://greensock.com/standard-license or for
  * Club GreenSock members, the agreement issued with that membership.
  * @author: Jack Doyle, jack@greensock.com
@@ -1986,6 +1979,8 @@ var _config = {
   delay: 0
 },
     _suppressOverwrites,
+    _reverting,
+    _context,
     _bigNum = 1e8,
     _tinyNum = 1 / _bigNum,
     _2PI = Math.PI * 2,
@@ -2029,8 +2024,9 @@ _numWithUnitExp = /[-+=.]*\d+[.e-]*\d*[a-z%]*/g,
     _complexStringNumExp = /[-+=.]*\d+\.?\d*(?:e-|e\+)?\d*/gi,
     //duplicate so that while we're looping through matches from exec(), it doesn't contaminate the lastIndex of _numExp which we use to search for colors too.
 _relExp = /[+-]=-?[.\d]+/,
-    _delimitedValueExp = /[#\-+.]*\b[a-z\d-=+%.]+/gi,
-    _unitExp = /[\d.+\-=]+(?:e[-+]\d*)*/i,
+    _delimitedValueExp = /[^,'"\[\]\s]+/gi,
+    // previously /[#\-+.]*\b[a-z\d\-=+%.]+/gi but didn't catch special characters.
+_unitExp = /^[+\-=e\s\d]*\d+[.\d]*([a-z]*|%)\s*$/i,
     _globalTimeline,
     _win,
     _coreInitted,
@@ -2052,6 +2048,13 @@ _relExp = /[+-]=-?[.\d]+/,
 },
     _emptyFunc = function _emptyFunc() {
   return 0;
+},
+    _startAtRevertConfig = {
+  suppressEvents: true,
+  isStart: true
+},
+    _revertConfig = {
+  suppressEvents: true
 },
     _reservedProps = {},
     _lazyTweens = [],
@@ -2098,6 +2101,16 @@ _relExp = /[+-]=-?[.\d]+/,
 _round = function _round(value) {
   return Math.round(value * 100000) / 100000 || 0;
 },
+    _roundPrecise = function _roundPrecise(value) {
+  return Math.round(value * 10000000) / 10000000 || 0;
+},
+    // increased precision mostly for timing values.
+_parseRelative = function _parseRelative(start, value) {
+  var operator = value.charAt(0),
+      end = parseFloat(value.substr(2));
+  start = parseFloat(start);
+  return operator === "+" ? start + end : operator === "-" ? start - end : operator === "*" ? start * end : start / end;
+},
     _arrayContainsAny = function _arrayContainsAny(toSearch, toFind) {
   //searches one array to find matches for any of the items in the toFind array. As soon as one is found, it returns true. It does NOT return all the matches; it's simply a boolean search.
   var l = toFind.length,
@@ -2106,31 +2119,6 @@ _round = function _round(value) {
   for (; toSearch.indexOf(toFind[i]) < 0 && ++i < l;) {}
 
   return i < l;
-},
-    _parseVars = function _parseVars(params, type, parent) {
-  //reads the arguments passed to one of the key methods and figures out if the user is defining things with the OLD/legacy syntax where the duration is the 2nd parameter, and then it adjusts things accordingly and spits back the corrected vars object (with the duration added if necessary, as well as runBackwards or startAt or immediateRender). type 0 = to()/staggerTo(), 1 = from()/staggerFrom(), 2 = fromTo()/staggerFromTo()
-  var isLegacy = _isNumber(params[1]),
-      varsIndex = (isLegacy ? 2 : 1) + (type < 2 ? 0 : 1),
-      vars = params[varsIndex],
-      irVars;
-
-  isLegacy && (vars.duration = params[1]);
-  vars.parent = parent;
-
-  if (type) {
-    irVars = vars;
-
-    while (parent && !("immediateRender" in irVars)) {
-      // inheritance hasn't happened yet, but someone may have set a default in an ancestor timeline. We could do vars.immediateRender = _isNotFalse(_inheritDefaults(vars).immediateRender) but that'd exact a slight performance penalty because _inheritDefaults() also runs in the Tween constructor. We're paying a small kb price here to gain speed.
-      irVars = parent.vars.defaults || {};
-      parent = _isNotFalse(parent.vars.inherit) && parent.parent;
-    }
-
-    vars.immediateRender = _isNotFalse(irVars.immediateRender);
-    type < 2 ? vars.runBackwards = 1 : vars.startAt = params[varsIndex - 1]; // "from" vars
-  }
-
-  return vars;
 },
     _lazyRender = function _lazyRender() {
   var l = _lazyTweens.length,
@@ -2148,7 +2136,7 @@ _round = function _round(value) {
 },
     _lazySafeRender = function _lazySafeRender(animation, time, suppressEvents, force) {
   _lazyTweens.length && _lazyRender();
-  animation.render(time, suppressEvents, force);
+  animation.render(time, suppressEvents, force || _reverting);
   _lazyTweens.length && _lazyRender(); //in case rendering caused any tweens to lazy-init, we should render them because typically when someone calls seek() or time() or progress(), they expect an immediate render.
 },
     _numericIfPossible = function _numericIfPossible(value) {
@@ -2165,10 +2153,12 @@ _round = function _round(value) {
 
   return obj;
 },
-    _setKeyframeDefaults = function _setKeyframeDefaults(obj, defaults) {
-  for (var p in defaults) {
-    p in obj || p === "duration" || p === "ease" || (obj[p] = defaults[p]);
-  }
+    _setKeyframeDefaults = function _setKeyframeDefaults(excludeDuration) {
+  return function (obj, defaults) {
+    for (var p in defaults) {
+      p in obj || p === "duration" && excludeDuration || p === "ease" || (obj[p] = defaults[p]);
+    }
+  };
 },
     _merge = function _merge(base, toMerge) {
   for (var p in toMerge) {
@@ -2196,7 +2186,7 @@ _round = function _round(value) {
 },
     _inheritDefaults = function _inheritDefaults(vars) {
   var parent = vars.parent || _globalTimeline,
-      func = vars.keyframes ? _setKeyframeDefaults : _setDefaults;
+      func = vars.keyframes ? _setKeyframeDefaults(_isArray(vars.keyframes)) : _setDefaults;
 
   if (_isNotFalse(vars.inherit)) {
     while (parent) {
@@ -2308,6 +2298,9 @@ _round = function _round(value) {
 
   return animation;
 },
+    _rewindStartAt = function _rewindStartAt(tween, totalTime, suppressEvents, force) {
+  return tween._startAt && (_reverting ? tween._startAt.revert(_revertConfig) : tween.vars.immediateRender && !tween.vars.autoRevert || tween._startAt.render(totalTime, true, force));
+},
     _hasNoPausedAncestors = function _hasNoPausedAncestors(animation) {
   return !animation || animation._ts && _hasNoPausedAncestors(animation.parent);
 },
@@ -2323,14 +2316,14 @@ _animationCycle = function _animationCycle(tTime, cycleDuration) {
   return (parentTime - child._start) * child._ts + (child._ts >= 0 ? 0 : child._dirty ? child.totalDuration() : child._tDur);
 },
     _setEnd = function _setEnd(animation) {
-  return animation._end = _round(animation._start + (animation._tDur / Math.abs(animation._ts || animation._rts || _tinyNum) || 0));
+  return animation._end = _roundPrecise(animation._start + (animation._tDur / Math.abs(animation._ts || animation._rts || _tinyNum) || 0));
 },
     _alignPlayhead = function _alignPlayhead(animation, totalTime) {
   // adjusts the animation's _start and _end according to the provided totalTime (only if the parent's smoothChildTiming is true and the animation isn't paused). It doesn't do any rendering or forcing things back into parent timelines, etc. - that's what totalTime() is for.
   var parent = animation._dp;
 
   if (parent && parent.smoothChildTiming && animation._ts) {
-    animation._start = _round(parent._time - (animation._ts > 0 ? totalTime / animation._ts : ((animation._dirty ? animation.totalDuration() : animation._tDur) - totalTime) / -animation._ts));
+    animation._start = _roundPrecise(parent._time - (animation._ts > 0 ? totalTime / animation._ts : ((animation._dirty ? animation.totalDuration() : animation._tDur) - totalTime) / -animation._ts));
 
     _setEnd(animation);
 
@@ -2380,13 +2373,15 @@ _postAddChecks = function _postAddChecks(timeline, child) {
 },
     _addToTimeline = function _addToTimeline(timeline, child, position, skipChecks) {
   child.parent && _removeFromParent(child);
-  child._start = _round(position + child._delay);
-  child._end = _round(child._start + (child.totalDuration() / Math.abs(child.timeScale()) || 0));
+  child._start = _roundPrecise((_isNumber(position) ? position : position || timeline !== _globalTimeline ? _parsePosition(timeline, position, child) : timeline._time) + child._delay);
+  child._end = _roundPrecise(child._start + (child.totalDuration() / Math.abs(child.timeScale()) || 0));
 
   _addLinkedListItem(timeline, child, "_first", "_last", timeline._sort ? "_start" : 0);
 
-  timeline._recent = child;
+  _isFromOrFromStart(child) || (timeline._recent = child);
   skipChecks || _postAddChecks(timeline, child);
+  timeline._ts < 0 && _alignPlayhead(timeline, timeline._tTime); // if the timeline is reversed and the new child makes it longer, we may need to adjust the parent's _start (push it back)
+
   return timeline;
 },
     _scrollTrigger = function _scrollTrigger(animation, trigger) {
@@ -2411,10 +2406,14 @@ _postAddChecks = function _postAddChecks(timeline, child) {
   return parent && parent._ts && parent._initted && !parent._lock && (parent.rawTime() < 0 || _parentPlayheadIsBeforeStart(parent));
 },
     // check parent's _lock because when a timeline repeats/yoyos and does its artificial wrapping, we shouldn't force the ratio back to 0
-_renderZeroDurationTween = function _renderZeroDurationTween(tween, totalTime, suppressEvents, force) {
+_isFromOrFromStart = function _isFromOrFromStart(_ref2) {
+  var data = _ref2.data;
+  return data === "isFromStart" || data === "isStart";
+},
+    _renderZeroDurationTween = function _renderZeroDurationTween(tween, totalTime, suppressEvents, force) {
   var prevRatio = tween.ratio,
-      ratio = totalTime < 0 || !totalTime && (!tween._start && _parentPlayheadIsBeforeStart(tween) || (tween._ts < 0 || tween._dp._ts < 0) && tween.data !== "isFromStart" && tween.data !== "isStart") ? 0 : 1,
-      // if the tween or its parent is reversed and the totalTime is 0, we should go to a ratio of 0.
+      ratio = totalTime < 0 || !totalTime && (!tween._start && _parentPlayheadIsBeforeStart(tween) && !(!tween._initted && _isFromOrFromStart(tween)) || (tween._ts < 0 || tween._dp._ts < 0) && !_isFromOrFromStart(tween)) ? 0 : 1,
+      // if the tween or its parent is reversed and the totalTime is 0, we should go to a ratio of 0. Edge case: if a from() or fromTo() stagger tween is placed later in a timeline, the "startAt" zero-duration tween could initially render at a time when the parent timeline's playhead is technically BEFORE where this tween is, so make sure that any "from" and "fromTo" startAt tweens are rendered the first time at a ratio of 1.
   repeatDelay = tween._rDelay,
       tTime = 0,
       pt,
@@ -2425,16 +2424,16 @@ _renderZeroDurationTween = function _renderZeroDurationTween(tween, totalTime, s
     // in case there's a zero-duration tween that has a repeat with a repeatDelay
     tTime = _clamp(0, tween._tDur, totalTime);
     iteration = _animationCycle(tTime, repeatDelay);
-    prevIteration = _animationCycle(tween._tTime, repeatDelay);
     tween._yoyo && iteration & 1 && (ratio = 1 - ratio);
 
-    if (iteration !== prevIteration) {
+    if (iteration !== _animationCycle(tween._tTime, repeatDelay)) {
+      // if iteration changed
       prevRatio = 1 - ratio;
       tween.vars.repeatRefresh && tween._initted && tween.invalidate();
     }
   }
 
-  if (ratio !== prevRatio || force || tween._zTime === _tinyNum || !totalTime && tween._zTime) {
+  if (ratio !== prevRatio || _reverting || force || tween._zTime === _tinyNum || !totalTime && tween._zTime) {
     if (!tween._initted && _attemptInitTween(tween, totalTime, force, suppressEvents)) {
       // if we render the very beginning (time == 0) of a fromTo(), we must force the render (normal tweens wouldn't need to render at a time of 0 when the prevTime was also 0). This is also mandatory to make sure overwriting kicks in immediately.
       return;
@@ -2449,7 +2448,6 @@ _renderZeroDurationTween = function _renderZeroDurationTween(tween, totalTime, s
     tween._from && (ratio = 1 - ratio);
     tween._time = 0;
     tween._tTime = tTime;
-    suppressEvents || _callback(tween, "onStart");
     pt = tween._pt;
 
     while (pt) {
@@ -2457,14 +2455,14 @@ _renderZeroDurationTween = function _renderZeroDurationTween(tween, totalTime, s
       pt = pt._next;
     }
 
-    tween._startAt && totalTime < 0 && tween._startAt.render(totalTime, true, true);
+    totalTime < 0 && _rewindStartAt(tween, totalTime, suppressEvents, true);
     tween._onUpdate && !suppressEvents && _callback(tween, "onUpdate");
     tTime && tween._repeat && !suppressEvents && tween.parent && _callback(tween, "onRepeat");
 
     if ((totalTime >= tween._tDur || totalTime < 0) && tween.ratio === ratio) {
       ratio && _removeFromParent(tween, 1);
 
-      if (!suppressEvents) {
+      if (!suppressEvents && !_reverting) {
         _callback(tween, ratio ? "onComplete" : "onReverseComplete", true);
 
         tween._prom && tween._prom();
@@ -2481,7 +2479,7 @@ _renderZeroDurationTween = function _renderZeroDurationTween(tween, totalTime, s
     child = animation._first;
 
     while (child && child._start <= time) {
-      if (!child._dur && child.data === "isPause" && child._start > prevTime) {
+      if (child.data === "isPause" && child._start > prevTime) {
         return child;
       }
 
@@ -2491,7 +2489,7 @@ _renderZeroDurationTween = function _renderZeroDurationTween(tween, totalTime, s
     child = animation._last;
 
     while (child && child._start >= time) {
-      if (!child._dur && child.data === "isPause" && child._start < prevTime) {
+      if (child.data === "isPause" && child._start < prevTime) {
         return child;
       }
 
@@ -2501,12 +2499,12 @@ _renderZeroDurationTween = function _renderZeroDurationTween(tween, totalTime, s
 },
     _setDuration = function _setDuration(animation, duration, skipUncache, leavePlayhead) {
   var repeat = animation._repeat,
-      dur = _round(duration) || 0,
+      dur = _roundPrecise(duration) || 0,
       totalProgress = animation._tTime / animation._tDur;
   totalProgress && !leavePlayhead && (animation._time *= dur / animation._dur);
   animation._dur = dur;
-  animation._tDur = !repeat ? dur : repeat < 0 ? 1e10 : _round(dur * (repeat + 1) + animation._rDelay * repeat);
-  totalProgress && !leavePlayhead ? _alignPlayhead(animation, animation._tTime = animation._tDur * totalProgress) : animation.parent && _setEnd(animation);
+  animation._tDur = !repeat ? dur : repeat < 0 ? 1e10 : _roundPrecise(dur * (repeat + 1) + animation._rDelay * repeat);
+  totalProgress > 0 && !leavePlayhead ? _alignPlayhead(animation, animation._tTime = animation._tDur * totalProgress) : animation.parent && _setEnd(animation);
   skipUncache || _uncache(animation.parent, animation);
   return animation;
 },
@@ -2515,36 +2513,70 @@ _renderZeroDurationTween = function _renderZeroDurationTween(tween, totalTime, s
 },
     _zeroPosition = {
   _start: 0,
-  endTime: _emptyFunc
+  endTime: _emptyFunc,
+  totalDuration: _emptyFunc
 },
-    _parsePosition = function _parsePosition(animation, position) {
+    _parsePosition = function _parsePosition(animation, position, percentAnimation) {
   var labels = animation.labels,
       recent = animation._recent || _zeroPosition,
       clippedDuration = animation.duration() >= _bigNum ? recent.endTime(false) : animation._dur,
       //in case there's a child that infinitely repeats, users almost never intend for the insertion point of a new child to be based on a SUPER long value like that so we clip it and assume the most recently-added child's endTime should be used instead.
   i,
-      offset;
+      offset,
+      isPercent;
 
   if (_isString(position) && (isNaN(position) || position in labels)) {
     //if the string is a number like "1", check to see if there's a label with that name, otherwise interpret it as a number (absolute value).
-    i = position.charAt(0);
-
-    if (i === "<" || i === ">") {
-      return (i === "<" ? recent._start : recent.endTime(recent._repeat >= 0)) + (parseFloat(position.substr(1)) || 0);
-    }
-
+    offset = position.charAt(0);
+    isPercent = position.substr(-1) === "%";
     i = position.indexOf("=");
+
+    if (offset === "<" || offset === ">") {
+      i >= 0 && (position = position.replace(/=/, ""));
+      return (offset === "<" ? recent._start : recent.endTime(recent._repeat >= 0)) + (parseFloat(position.substr(1)) || 0) * (isPercent ? (i < 0 ? recent : percentAnimation).totalDuration() / 100 : 1);
+    }
 
     if (i < 0) {
       position in labels || (labels[position] = clippedDuration);
       return labels[position];
     }
 
-    offset = +(position.charAt(i - 1) + position.substr(i + 1));
-    return i > 1 ? _parsePosition(animation, position.substr(0, i - 1)) + offset : clippedDuration + offset;
+    offset = parseFloat(position.charAt(i - 1) + position.substr(i + 1));
+
+    if (isPercent && percentAnimation) {
+      offset = offset / 100 * (_isArray(percentAnimation) ? percentAnimation[0] : percentAnimation).totalDuration();
+    }
+
+    return i > 1 ? _parsePosition(animation, position.substr(0, i - 1), percentAnimation) + offset : clippedDuration + offset;
   }
 
   return position == null ? clippedDuration : +position;
+},
+    _createTweenType = function _createTweenType(type, params, timeline) {
+  var isLegacy = _isNumber(params[1]),
+      varsIndex = (isLegacy ? 2 : 1) + (type < 2 ? 0 : 1),
+      vars = params[varsIndex],
+      irVars,
+      parent;
+
+  isLegacy && (vars.duration = params[1]);
+  vars.parent = timeline;
+
+  if (type) {
+    irVars = vars;
+    parent = timeline;
+
+    while (parent && !("immediateRender" in irVars)) {
+      // inheritance hasn't happened yet, but someone may have set a default in an ancestor timeline. We could do vars.immediateRender = _isNotFalse(_inheritDefaults(vars).immediateRender) but that'd exact a slight performance penalty because _inheritDefaults() also runs in the Tween constructor. We're paying a small kb price here to gain speed.
+      irVars = parent.vars.defaults || {};
+      parent = _isNotFalse(parent.vars.inherit) && parent.parent;
+    }
+
+    vars.immediateRender = _isNotFalse(irVars.immediateRender);
+    type < 2 ? vars.runBackwards = 1 : vars.startAt = params[varsIndex - 1]; // "from" vars
+  }
+
+  return new Tween(params[0], vars, params[varsIndex + 1]);
 },
     _conditionalReturn = function _conditionalReturn(value, func) {
   return value || value === 0 ? func(value) : func;
@@ -2552,14 +2584,8 @@ _renderZeroDurationTween = function _renderZeroDurationTween(tween, totalTime, s
     _clamp = function _clamp(min, max, value) {
   return value < min ? min : value > max ? max : value;
 },
-    getUnit = function getUnit(value) {
-  if (typeof value !== "string") {
-    return "";
-  }
-
-  var v = _unitExp.exec(value);
-
-  return v ? value.substr(v.index + v[0].length) : "";
+    getUnit = function getUnit(value, v) {
+  return !_isString(value) || !(v = _unitExp.exec(value)) ? "" : v[1];
 },
     // note: protect against padded numbers as strings, like "100.100". That shouldn't return "00" as the unit. If it's numeric, return no unit.
 clamp = function clamp(min, max, value) {
@@ -2583,8 +2609,15 @@ clamp = function clamp(min, max, value) {
   }) || accumulator;
 },
     //takes any value and returns an array. If it's a string (and leaveStrings isn't true), it'll use document.querySelectorAll() and convert that to an array. It'll also accept iterables like jQuery objects.
-toArray = function toArray(value, leaveStrings) {
-  return _isString(value) && !leaveStrings && (_coreInitted || !_wake()) ? _slice.call(_doc.querySelectorAll(value), 0) : _isArray(value) ? _flatten(value, leaveStrings) : _isArrayLike(value) ? _slice.call(value, 0) : value ? [value] : [];
+toArray = function toArray(value, scope, leaveStrings) {
+  return _context && !scope && _context.selector ? _context.selector(value) : _isString(value) && !leaveStrings && (_coreInitted || !_wake()) ? _slice.call((scope || _doc).querySelectorAll(value), 0) : _isArray(value) ? _flatten(value, leaveStrings) : _isArrayLike(value) ? _slice.call(value, 0) : value ? [value] : [];
+},
+    selector = function selector(value) {
+  value = toArray(value)[0] || _warn("Invalid scope") || {};
+  return function (v) {
+    var el = value.current || value.nativeElement || value;
+    return toArray(v, el.querySelectorAll ? el : el === value ? _warn("Invalid scope") || _doc.createElement("div") : value);
+  };
 },
     shuffle = function shuffle(a) {
   return a.sort(function () {
@@ -2649,7 +2682,7 @@ distribute = function distribute(v) {
 
       distances = cache[l] = [];
       originX = ratios ? Math.min(wrapAt, l) * ratioX - .5 : from % wrapAt;
-      originY = ratios ? l * ratioY / wrapAt - .5 : from / wrapAt | 0;
+      originY = wrapAt === _bigNum ? 0 : ratios ? l * ratioY / wrapAt - .5 : from / wrapAt | 0;
       max = 0;
       min = _bigNum;
 
@@ -2672,15 +2705,16 @@ distribute = function distribute(v) {
     }
 
     l = (distances[i] - distances.min) / distances.max || 0;
-    return _round(distances.b + (ease ? ease(l) : l) * distances.v) + distances.u; //round in order to work around floating point errors
+    return _roundPrecise(distances.b + (ease ? ease(l) : l) * distances.v) + distances.u; //round in order to work around floating point errors
   };
 },
     _roundModifier = function _roundModifier(v) {
   //pass in 0.1 get a function that'll round to the nearest tenth, or 5 to round to the closest 5, or 0.001 to the closest 1000th, etc.
-  var p = v < 1 ? Math.pow(10, (v + "").length - 2) : 1; //to avoid floating point math errors (like 24 * 0.1 == 2.4000000000000004), we chop off at a specific number of decimal places (much faster than toFixed()
+  var p = Math.pow(10, ((v + "").split(".")[1] || "").length); //to avoid floating point math errors (like 24 * 0.1 == 2.4000000000000004), we chop off at a specific number of decimal places (much faster than toFixed())
 
   return function (raw) {
-    var n = Math.round(parseFloat(raw) / v) * v * p;
+    var n = _roundPrecise(Math.round(parseFloat(raw) / v) * v * p);
+
     return (n - n % 1) / p + (_isNumber(raw) ? 0 : getUnit(raw)); // n - n % 1 replaces Math.floor() in order to handle negative values properly. For example, Math.floor(-150.00000000000003) is 151!
   };
 },
@@ -2884,8 +2918,11 @@ distribute = function distribute(v) {
     _callback = function _callback(animation, type, executeLazyFirst) {
   var v = animation.vars,
       callback = v[type],
+      prevContext = _context,
+      context = animation._ctx,
       params,
-      scope;
+      scope,
+      result;
 
   if (!callback) {
     return;
@@ -2895,11 +2932,15 @@ distribute = function distribute(v) {
   scope = v.callbackScope || animation;
   executeLazyFirst && _lazyTweens.length && _lazyRender(); //in case rendering caused any tweens to lazy-init, we should render them because typically when a timeline finishes, users expect things to have rendered fully. Imagine an onUpdate on a timeline that reports/checks tweened values.
 
-  return params ? callback.apply(scope, params) : callback.call(scope);
+  context && (_context = context);
+  result = params ? callback.apply(scope, params) : callback.call(scope);
+  _context = prevContext;
+  return result;
 },
     _interrupt = function _interrupt(animation) {
   _removeFromParent(animation);
 
+  animation.scrollTrigger && animation.scrollTrigger.kill(false);
   animation.progress() < 1 && _callback(animation, "onInterrupt");
   return animation;
 },
@@ -2985,8 +3026,11 @@ _255 = 255,
   cyan: [0, _255, _255],
   transparent: [_255, _255, _255, 0]
 },
-    _hue = function _hue(h, m1, m2) {
-  h = h < 0 ? h + 1 : h > 1 ? h - 1 : h;
+    // possible future idea to replace the hard-coded color name values - put this in the ticker.wake() where we set the _doc:
+// let ctx = _doc.createElement("canvas").getContext("2d");
+// _forEachName("aqua,lime,silver,black,maroon,teal,blue,navy,white,olive,yellow,orange,gray,purple,green,red,pink,cyan", color => {ctx.fillStyle = color; _colorLookup[color] = splitColor(ctx.fillStyle)});
+_hue = function _hue(h, m1, m2) {
+  h += h < 0 ? 1 : h > 1 ? -1 : 0;
   return (h * 6 < 1 ? m1 + (m2 - m1) * h * 6 : h < .5 ? m2 : h * 3 < 2 ? m1 + (m2 - m1) * (2 / 3 - h) * 6 : m1) * _255 + .5 | 0;
 },
     splitColor = function splitColor(v, toHSL, forceAlpha) {
@@ -3260,13 +3304,22 @@ _tickerActive,
       _gap = 1000 / (_fps || 240);
       _nextTime = _self.time * 1000 + _gap;
     },
-    add: function add(callback) {
-      _listeners.indexOf(callback) < 0 && _listeners.push(callback);
+    add: function add(callback, once, prioritize) {
+      var func = once ? function (t, d, f, v) {
+        callback(t, d, f, v);
+
+        _self.remove(func);
+      } : callback;
+
+      _self.remove(callback);
+
+      _listeners[prioritize ? "unshift" : "push"](func);
 
       _wake();
+
+      return func;
     },
-    remove: function remove(callback) {
-      var i;
+    remove: function remove(callback, i) {
       ~(i = _listeners.indexOf(callback)) && _listeners.splice(i, 1) && _i >= i && _i--;
     },
     _listeners: _listeners
@@ -3439,6 +3492,7 @@ _propagateYoyoEase = function _propagateYoyoEase(timeline, isYoyo) {
 
 exports._ticker = _ticker;
 exports._colorStringFilter = _colorStringFilter;
+exports._colorExp = _colorExp;
 exports.splitColor = splitColor;
 exports.interpolate = interpolate;
 exports.mapRange = mapRange;
@@ -3453,11 +3507,13 @@ exports.snap = snap;
 exports._roundModifier = _roundModifier;
 exports.distribute = distribute;
 exports.shuffle = shuffle;
+exports.selector = selector;
 exports.toArray = toArray;
 exports.clamp = clamp;
 exports.getUnit = getUnit;
 exports._removeLinkedListItem = _removeLinkedListItem;
 exports._setDefaults = _setDefaults;
+exports._parseRelative = _parseRelative;
 exports._round = _round;
 exports._forEachName = _forEachName;
 exports._getProperty = _getProperty;
@@ -3561,8 +3617,7 @@ var GSCache = function GSCache(target, harness) {
 exports.GSCache = GSCache;
 
 var Animation = /*#__PURE__*/function () {
-  function Animation(vars, time) {
-    var parent = vars.parent || _globalTimeline;
+  function Animation(vars) {
     this.vars = vars;
     this._delay = +vars.delay || 0;
 
@@ -3577,10 +3632,14 @@ var Animation = /*#__PURE__*/function () {
     _setDuration(this, +vars.duration, 1, 1);
 
     this.data = vars.data;
+
+    if (_context) {
+      this._ctx = _context;
+
+      _context.data.push(this);
+    }
+
     _tickerActive || _ticker.wake();
-    parent && _addToTimeline(parent, this, time || time === 0 ? time : parent._time, 1);
-    vars.reversed && this.reverse();
-    vars.paused && this.paused(true);
   }
 
   var _proto = Animation.prototype;
@@ -3623,7 +3682,7 @@ var Animation = /*#__PURE__*/function () {
       !parent._dp || parent.parent || _postAddChecks(parent, this); // edge case: if this is a child of a timeline that already completed, for example, we must re-activate the parent.
       //in case any of the ancestor timelines had completed but should now be enabled, we should reset their totalTime() which will also ensure that they're lined up properly and enabled. Skip for animations that are on the root (wasteful). Example: a TimelineLite.exportRoot() is performed when there's a paused tween on the root, the export will not complete until that tween is unpaused, but imagine a child gets restarted later, after all [unpaused] tweens have completed. The start of that child would get pushed out, but one of the ancestors may have completed.
 
-      while (parent.parent) {
+      while (parent && parent.parent) {
         if (parent.parent._time !== parent._start + (parent._ts >= 0 ? parent._tTime / parent._ts : (parent.totalDuration() - parent._tTime) / -parent._ts)) {
           parent.totalTime(parent._tTime, true);
         }
@@ -3652,7 +3711,7 @@ var Animation = /*#__PURE__*/function () {
   };
 
   _proto.time = function time(value, suppressEvents) {
-    return arguments.length ? this.totalTime(Math.min(this.totalDuration(), value + _elapsedCycleDuration(this)) % this._dur || (value ? this._dur : 0), suppressEvents) : this._time; // note: if the modulus results in 0, the playhead could be exactly at the end or the beginning, and we always defer to the END with a non-zero value, otherwise if you set the time() to the very end (duration()), it would render at the START!
+    return arguments.length ? this.totalTime(Math.min(this.totalDuration(), value + _elapsedCycleDuration(this)) % (this._dur + this._rDelay) || (value ? this._dur : 0), suppressEvents) : this._time; // note: if the modulus results in 0, the playhead could be exactly at the end or the beginning, and we always defer to the END with a non-zero value, otherwise if you set the time() to the very end (duration()), it would render at the START!
   };
 
   _proto.totalProgress = function totalProgress(value, suppressEvents) {
@@ -3689,12 +3748,19 @@ var Animation = /*#__PURE__*/function () {
     }
 
     var tTime = this.parent && this._ts ? _parentToChildTotalTime(this.parent._time, this) : this._tTime; // make sure to do the parentToChildTotalTime() BEFORE setting the new _ts because the old one must be used in that calculation.
+    // future addition? Up side: fast and minimal file size. Down side: only works on this animation; if a timeline is reversed, for example, its childrens' onReverse wouldn't get called.
+    //(+value < 0 && this._rts >= 0) && _callback(this, "onReverse", true);
     // prioritize rendering where the parent's playhead lines up instead of this._tTime because there could be a tween that's animating another tween's timeScale in the same rendering loop (same parent), thus if the timeScale tween renders first, it would alter _start BEFORE _tTime was set on that tick (in the rendering loop), effectively freezing it until the timeScale tween finishes.
 
     this._rts = +value || 0;
     this._ts = this._ps || value === -_tinyNum ? 0 : this._rts; // _ts is the functional timeScale which would be 0 if the animation is paused.
 
-    return _recacheAncestors(this.totalTime(_clamp(-this._delay, this._tDur, tTime), true));
+    this.totalTime(_clamp(-this._delay, this._tDur, tTime), true);
+
+    _setEnd(this); // if parent.smoothChildTiming was false, the end time didn't get updated in the _alignPlayhead() method, so do it here.
+
+
+    return _recacheAncestors(this);
   };
 
   _proto.paused = function paused(value) {
@@ -3714,7 +3780,7 @@ var Animation = /*#__PURE__*/function () {
 
         this._ts = this._rts; //only defer to _pTime (pauseTime) if tTime is zero. Remember, someone could pause() an animation, then scrub the playhead and resume(). If the parent doesn't have smoothChildTiming, we render at the rawTime() because the startTime won't get updated.
 
-        this.totalTime(this.parent && !this.parent.smoothChildTiming ? this.rawTime() : this._tTime || this._pTime, this.progress() === 1 && (this._tTime -= _tinyNum) && Math.abs(this._zTime) !== _tinyNum); // edge case: animation.progress(1).pause().play() wouldn't render again because the playhead is already at the end, but the call to totalTime() below will add it back to its parent...and not remove it again (since removing only happens upon rendering at a new time). Offsetting the _tTime slightly is done simply to cause the final render in totalTime() that'll pop it off its timeline (if autoRemoveChildren is true, of course). Check to make sure _zTime isn't -_tinyNum to avoid an edge case where the playhead is pushed to the end but INSIDE a tween/callback, the timeline itself is paused thus halting rendering and leaving a few unrendered. When resuming, it wouldn't render those otherwise.
+        this.totalTime(this.parent && !this.parent.smoothChildTiming ? this.rawTime() : this._tTime || this._pTime, this.progress() === 1 && Math.abs(this._zTime) !== _tinyNum && (this._tTime -= _tinyNum)); // edge case: animation.progress(1).pause().play() wouldn't render again because the playhead is already at the end, but the call to totalTime() below will add it back to its parent...and not remove it again (since removing only happens upon rendering at a new time). Offsetting the _tTime slightly is done simply to cause the final render in totalTime() that'll pop it off its timeline (if autoRemoveChildren is true, of course). Check to make sure _zTime isn't -_tinyNum to avoid an edge case where the playhead is pushed to the end but INSIDE a tween/callback, the timeline itself is paused thus halting rendering and leaving a few unrendered. When resuming, it wouldn't render those otherwise.
       }
     }
 
@@ -3733,13 +3799,27 @@ var Animation = /*#__PURE__*/function () {
   };
 
   _proto.endTime = function endTime(includeRepeats) {
-    return this._start + (_isNotFalse(includeRepeats) ? this.totalDuration() : this.duration()) / Math.abs(this._ts);
+    return this._start + (_isNotFalse(includeRepeats) ? this.totalDuration() : this.duration()) / Math.abs(this._ts || 1);
   };
 
   _proto.rawTime = function rawTime(wrapRepeats) {
-    var parent = this.parent || this._dp; // _dp = detatched parent
+    var parent = this.parent || this._dp; // _dp = detached parent
 
     return !parent ? this._tTime : wrapRepeats && (!this._ts || this._repeat && this._time && this.totalProgress() < 1) ? this._tTime % (this._dur + this._rDelay) : !this._ts ? this._tTime : _parentToChildTotalTime(parent.rawTime(wrapRepeats), this);
+  };
+
+  _proto.revert = function revert(config) {
+    if (config === void 0) {
+      config = _revertConfig;
+    }
+
+    var prevIsReverting = _reverting;
+    _reverting = config;
+    this.timeline && this.timeline.revert(config);
+    this.totalTime(-0.01, config.suppressEvents);
+    this.data !== "nested" && _removeFromParent(this);
+    _reverting = prevIsReverting;
+    return this;
   };
 
   _proto.globalTime = function globalTime(rawTime) {
@@ -3751,7 +3831,7 @@ var Animation = /*#__PURE__*/function () {
       animation = animation._dp;
     }
 
-    return time;
+    return !this.parent && this.vars.immediateRender ? -1 : time; // the _startAt tweens for .fromTo() and .from() that have immediateRender should always be FIRST in the timeline (important for Recording.revert())
   };
 
   _proto.repeat = function repeat(value) {
@@ -3765,8 +3845,12 @@ var Animation = /*#__PURE__*/function () {
 
   _proto.repeatDelay = function repeatDelay(value) {
     if (arguments.length) {
+      var time = this._time;
       this._rDelay = value;
-      return _onUpdateTotalDuration(this);
+
+      _onUpdateTotalDuration(this);
+
+      return time ? this.time(time) : this;
     }
 
     return this._rDelay;
@@ -3909,19 +3993,21 @@ _setDefaults(Animation.prototype, {
 var Timeline = /*#__PURE__*/function (_Animation) {
   _inheritsLoose(Timeline, _Animation);
 
-  function Timeline(vars, time) {
+  function Timeline(vars, position) {
     var _this;
 
     if (vars === void 0) {
       vars = {};
     }
 
-    _this = _Animation.call(this, vars, time) || this;
+    _this = _Animation.call(this, vars) || this;
     _this.labels = {};
     _this.smoothChildTiming = !!vars.smoothChildTiming;
     _this.autoRemoveChildren = !!vars.autoRemoveChildren;
     _this._sort = _isNotFalse(vars.sortChildren);
-    _this.parent && _postAddChecks(_this.parent, _assertThisInitialized(_this));
+    _globalTimeline && _addToTimeline(vars.parent || _globalTimeline, _assertThisInitialized(_this), position);
+    vars.reversed && _this.reverse();
+    vars.paused && _this.paused(true);
     vars.scrollTrigger && _scrollTrigger(_assertThisInitialized(_this), vars.scrollTrigger);
     return _this;
   }
@@ -3929,17 +4015,20 @@ var Timeline = /*#__PURE__*/function (_Animation) {
   var _proto2 = Timeline.prototype;
 
   _proto2.to = function to(targets, vars, position) {
-    new Tween(targets, _parseVars(arguments, 0, this), _parsePosition(this, _isNumber(vars) ? arguments[3] : position));
+    _createTweenType(0, arguments, this);
+
     return this;
   };
 
   _proto2.from = function from(targets, vars, position) {
-    new Tween(targets, _parseVars(arguments, 1, this), _parsePosition(this, _isNumber(vars) ? arguments[3] : position));
+    _createTweenType(1, arguments, this);
+
     return this;
   };
 
   _proto2.fromTo = function fromTo(targets, fromVars, toVars, position) {
-    new Tween(targets, _parseVars(arguments, 2, this), _parsePosition(this, _isNumber(fromVars) ? arguments[4] : position));
+    _createTweenType(2, arguments, this);
+
     return this;
   };
 
@@ -3953,7 +4042,7 @@ var Timeline = /*#__PURE__*/function (_Animation) {
   };
 
   _proto2.call = function call(callback, params, position) {
-    return _addToTimeline(this, Tween.delayedCall(0, callback, params), _parsePosition(this, position));
+    return _addToTimeline(this, Tween.delayedCall(0, callback, params), position);
   } //ONLY for backward compatibility! Maybe delete?
   ;
 
@@ -3983,8 +4072,9 @@ var Timeline = /*#__PURE__*/function (_Animation) {
     var prevTime = this._time,
         tDur = this._dirty ? this.totalDuration() : this._tDur,
         dur = this._dur,
-        tTime = this !== _globalTimeline && totalTime > tDur - _tinyNum && totalTime >= 0 ? tDur : totalTime < _tinyNum ? 0 : totalTime,
-        crossingStart = this._zTime < 0 !== totalTime < 0 && (this._initted || !dur),
+        tTime = totalTime <= 0 ? 0 : _roundPrecise(totalTime),
+        // if a paused timeline is resumed (or its _start is updated for another reason...which rounds it), that could result in the playhead shifting a **tiny** amount and a zero-duration child at that spot may get rendered at a different ratio, like its totalTime in render() may be 1e-17 instead of 0, for example.
+    crossingStart = this._zTime < 0 !== totalTime < 0 && (this._initted || !dur),
         time,
         child,
         next,
@@ -3997,6 +4087,7 @@ var Timeline = /*#__PURE__*/function (_Animation) {
         prevIteration,
         yoyo,
         isYoyo;
+    this !== _globalTimeline && tTime > tDur && totalTime >= 0 && (tTime = tDur);
 
     if (tTime !== this._tTime || force || crossingStart) {
       if (prevTime !== this._time && dur) {
@@ -4025,7 +4116,7 @@ var Timeline = /*#__PURE__*/function (_Animation) {
           return this.totalTime(cycleDuration * 100 + totalTime, suppressEvents, force);
         }
 
-        time = _round(tTime % cycleDuration); //round to avoid floating point errors. (4 % 0.8 should be 0 but some browsers report it as 0.79999999!)
+        time = _roundPrecise(tTime % cycleDuration); //round to avoid floating point errors. (4 % 0.8 should be 0 but some browsers report it as 0.79999999!)
 
         if (tTime === tDur) {
           // the tDur === tTime is for edge cases where there's a lengthy decimal on the duration and it may reach the very end but the time is rendered as not-quite-there (remember, tDur is rounded to 4 decimals whereas dur isn't)
@@ -4065,11 +4156,14 @@ var Timeline = /*#__PURE__*/function (_Animation) {
           iteration < prevIteration && (rewinding = !rewinding);
           prevTime = rewinding ? 0 : dur;
           this._lock = 1;
-          this.render(prevTime || (isYoyo ? 0 : _round(iteration * cycleDuration)), suppressEvents, !dur)._lock = 0;
+          this.render(prevTime || (isYoyo ? 0 : _roundPrecise(iteration * cycleDuration)), suppressEvents, !dur)._lock = 0;
+          this._tTime = tTime; // if a user gets the iteration() inside the onRepeat, for example, it should be accurate.
+
           !suppressEvents && this.parent && _callback(this, "onRepeat");
           this.vars.repeatRefresh && !isYoyo && (this.invalidate()._lock = 1);
 
-          if (prevTime !== this._time || prevPaused !== !this._ts) {
+          if (prevTime && prevTime !== this._time || prevPaused !== !this._ts || this.vars.onRepeat && !this.parent && !this._act) {
+            // if prevTime is 0 and we render at the very end, _time will be the end, thus won't match. So in this edge case, prevTime won't match _time but that's okay. If it gets killed in the onRepeat, eject as well.
             return this;
           }
 
@@ -4096,7 +4190,7 @@ var Timeline = /*#__PURE__*/function (_Animation) {
       }
 
       if (this._hasPause && !this._forcing && this._lock < 2) {
-        pauseTween = _findNextPauseTween(this, _round(prevTime), _round(time));
+        pauseTween = _findNextPauseTween(this, _roundPrecise(prevTime), _roundPrecise(time));
 
         if (pauseTween) {
           tTime -= time - (time = pauseTween._start);
@@ -4114,7 +4208,14 @@ var Timeline = /*#__PURE__*/function (_Animation) {
         prevTime = 0; // upon init, the playhead should always go forward; someone could invalidate() a completed timeline and then if they restart(), that would make child tweens render in reverse order which could lock in the wrong starting values if they build on each other, like tl.to(obj, {x: 100}).to(obj, {x: 0}).
       }
 
-      !prevTime && (time || !dur && totalTime >= 0) && !suppressEvents && _callback(this, "onStart");
+      if (!prevTime && time && !suppressEvents) {
+        _callback(this, "onStart");
+
+        if (this._tTime !== tTime) {
+          // in case the onStart triggered a render at a different spot, eject. Like if someone did animation.pause(0.5) or something inside the onStart.
+          return this;
+        }
+      }
 
       if (time >= prevTime && totalTime >= 0) {
         child = this._first;
@@ -4142,6 +4243,8 @@ var Timeline = /*#__PURE__*/function (_Animation) {
           child = next;
         }
       } else {
+        force = force || _reverting; // if reverting, we should always force renders. If, for example, a .fromTo() tween with a stagger (which creates an internal timeline) gets reverted BEFORE some of its child tweens render for the first time, it may not properly trigger them to revert.
+
         child = this._last;
         var adjustedTime = totalTime < 0 ? totalTime : time; //when the playhead goes backward beyond the start of this timeline, we must pass that information down to the child animations so that zero-duration tweens know whether to render their starting or ending values.
 
@@ -4184,11 +4287,12 @@ var Timeline = /*#__PURE__*/function (_Animation) {
       }
 
       this._onUpdate && !suppressEvents && _callback(this, "onUpdate", true);
-      if (tTime === tDur && tDur >= this.totalDuration() || !tTime && prevTime) if (prevStart === this._start || Math.abs(timeScale) !== Math.abs(this._ts)) if (!this._lock) {
+      if (tTime === tDur && this._tTime >= this.totalDuration() || !tTime && prevTime) if (prevStart === this._start || Math.abs(timeScale) !== Math.abs(this._ts)) if (!this._lock) {
+        // remember, a child's callback may alter this timeline's playhead or timeScale which is why we need to add some of these checks.
         (totalTime || !dur) && (tTime === tDur && this._ts > 0 || !tTime && this._ts < 0) && _removeFromParent(this, 1); // don't remove if the timeline is reversed and the playhead isn't at 0, otherwise tl.progress(1).reverse() won't work. Only remove if the playhead is at the end and timeScale is positive, or if the playhead is at 0 and the timeScale is negative.
 
-        if (!suppressEvents && !(totalTime < 0 && !prevTime) && (tTime || prevTime)) {
-          _callback(this, tTime === tDur ? "onComplete" : "onReverseComplete", true);
+        if (!suppressEvents && !(totalTime < 0 && !prevTime) && (tTime || prevTime || !tDur)) {
+          _callback(this, tTime === tDur && totalTime >= 0 ? "onComplete" : "onReverseComplete", true);
 
           this._prom && !(tTime < tDur && this.timeScale() > 0) && this._prom();
         }
@@ -4201,7 +4305,7 @@ var Timeline = /*#__PURE__*/function (_Animation) {
   _proto2.add = function add(child, position) {
     var _this2 = this;
 
-    _isNumber(position) || (position = _parsePosition(this, position));
+    _isNumber(position) || (position = _parsePosition(this, position, child));
 
     if (!(child instanceof Animation)) {
       if (_isArray(child)) {
@@ -4299,7 +4403,7 @@ var Timeline = /*#__PURE__*/function (_Animation) {
 
     if (!this._dp && this._ts) {
       //special case for the global timeline (or any other that has no parent or detached parent).
-      this._start = _round(_ticker.time - (this._ts > 0 ? _totalTime2 / this._ts : (this.totalDuration() - _totalTime2) / -this._ts));
+      this._start = _roundPrecise(_ticker.time - (this._ts > 0 ? _totalTime2 / this._ts : (this.totalDuration() - _totalTime2) / -this._ts));
     }
 
     _Animation.prototype.totalTime.call(this, _totalTime2, suppressEvents);
@@ -4375,7 +4479,7 @@ var Timeline = /*#__PURE__*/function (_Animation) {
   // targets() {
   // 	let result = [];
   // 	this.getChildren(true, true, false).forEach(t => result.push(...t.targets()));
-  // 	return result;
+  // 	return result.filter((v, i) => result.indexOf(v) === i);
   // }
   ;
 
@@ -4389,8 +4493,9 @@ var Timeline = /*#__PURE__*/function (_Animation) {
         _onStart = _vars.onStart,
         onStartParams = _vars.onStartParams,
         immediateRender = _vars.immediateRender,
+        initted,
         tween = Tween.to(tl, _setDefaults({
-      ease: "none",
+      ease: vars.ease || "none",
       lazy: false,
       immediateRender: false,
       time: endTime,
@@ -4398,8 +4503,13 @@ var Timeline = /*#__PURE__*/function (_Animation) {
       duration: vars.duration || Math.abs((endTime - (startAt && "time" in startAt ? startAt.time : tl._time)) / tl.timeScale()) || _tinyNum,
       onStart: function onStart() {
         tl.pause();
-        var duration = vars.duration || Math.abs((endTime - tl._time) / tl.timeScale());
-        tween._dur !== duration && _setDuration(tween, duration, 0, 1).render(tween._time, true, true);
+
+        if (!initted) {
+          var duration = vars.duration || Math.abs((endTime - (startAt && "time" in startAt ? startAt.time : tl._time)) / tl.timeScale());
+          tween._dur !== duration && _setDuration(tween, duration, 0, 1).render(tween._time, true, true);
+          initted = 1;
+        }
+
         _onStart && _onStart.apply(tween, onStartParams || []); //in case the user had an onStart in the vars - we don't want to overwrite it.
       }
     }, vars));
@@ -4639,7 +4749,7 @@ var _addComplexStringPropTween = function _addComplexStringPropTween(target, pro
         p: chunk || matchIndex === 1 ? chunk : ",",
         //note: SVG spec allows omission of comma/space when a negative sign is wedged between two numbers, like 2.5-5.3 instead of 2.5,-5.3 but when tweening, the negative value may switch to positive, so we insert the comma just in case.
         s: startNum,
-        c: endNum.charAt(1) === "=" ? parseFloat(endNum.substr(2)) * (endNum.charAt(0) === "-" ? -1 : 1) : parseFloat(endNum) - startNum,
+        c: endNum.charAt(1) === "=" ? _parseRelative(startNum, endNum) - startNum : parseFloat(endNum) - startNum,
         m: color && color < 4 ? Math.round : 0
       };
       index = _complexStringNumExp.lastIndex;
@@ -4658,7 +4768,7 @@ var _addComplexStringPropTween = function _addComplexStringPropTween(target, pro
 
   return pt;
 },
-    _addPropTween = function _addPropTween(target, prop, start, end, index, targets, modifier, stringFilter, funcParam) {
+    _addPropTween = function _addPropTween(target, prop, start, end, index, targets, modifier, stringFilter, funcParam, optional) {
   _isFunction(end) && (end = end(index || 0, target, targets));
   var currentValue = target[prop],
       parsedStart = start !== "get" ? start : !_isFunction(currentValue) ? currentValue : funcParam ? target[prop.indexOf("set") || !_isFunction(target["get" + prop.substr(3)]) ? prop : "get" + prop.substr(3)](funcParam) : target[prop](),
@@ -4671,12 +4781,18 @@ var _addComplexStringPropTween = function _addComplexStringPropTween(target, pro
     }
 
     if (end.charAt(1) === "=") {
-      end = parseFloat(parsedStart) + parseFloat(end.substr(2)) * (end.charAt(0) === "-" ? -1 : 1) + (getUnit(parsedStart) || 0);
+      pt = _parseRelative(parsedStart, end) + (getUnit(parsedStart) || 0);
+
+      if (pt || pt === 0) {
+        // to avoid isNaN, like if someone passes in a value like "!= whatever"
+        end = pt;
+      }
     }
   }
 
-  if (parsedStart !== end) {
-    if (!isNaN(parsedStart * end)) {
+  if (!optional || parsedStart !== end || _forceAllPropTweens) {
+    if (!isNaN(parsedStart * end) && end !== "") {
+      // fun fact: any number multiplied by "" is evaluated as the number 0!
       pt = new PropTween(this._pt, target, prop, +parsedStart || 0, end - (parsedStart || 0), typeof currentValue === "boolean" ? _renderBoolean : _renderPlain, 0, setter);
       funcParam && (pt.fp = funcParam);
       modifier && pt.modifier(modifier, this, target);
@@ -4725,7 +4841,8 @@ _processVars = function _processVars(vars, index, target, targets, tween) {
 },
     _overwritingTween,
     //store a reference temporarily so we can avoid overwriting itself.
-_initTween = function _initTween(tween, time) {
+_forceAllPropTweens,
+    _initTween = function _initTween(tween, time) {
   var vars = tween.vars,
       ease = vars.ease,
       startAt = vars.startAt,
@@ -4742,7 +4859,7 @@ _initTween = function _initTween(tween, time) {
       prevStartAt = tween._startAt,
       targets = tween._targets,
       parent = tween.parent,
-      fullTargets = parent && parent.data === "nested" ? parent.parent._targets : targets,
+      fullTargets = parent && parent.data === "nested" ? parent.vars.targets : targets,
       autoOverwrite = tween._overwrite === "auto" && !_suppressOverwrites,
       tl = tween.timeline,
       cleanVars,
@@ -4769,13 +4886,21 @@ _initTween = function _initTween(tween, time) {
     tween._ease = yoyoEase;
   }
 
-  if (!tl) {
+  tween._from = !tl && !!vars.runBackwards; //nested timelines should never run backwards - the backwards-ness is in the child tweens.
+
+  if (!tl || keyframes && !vars.stagger) {
     //if there's an internal timeline, skip all the parsing because we passed that task down the chain.
     harness = targets[0] ? _getCache(targets[0]).harness : 0;
     harnessVars = harness && vars[harness.prop]; //someone may need to specify CSS-specific values AND non-CSS values, like if the element has an "x" property plus it's a standard DOM element. We allow people to distinguish by wrapping plugin-specific stuff in a css:{} object for example.
 
     cleanVars = _copyExcluding(vars, _reservedProps);
-    prevStartAt && prevStartAt.render(-1, true).kill();
+
+    if (prevStartAt) {
+      time < 0 && runBackwards && immediateRender && !autoRevert ? prevStartAt.render(-1, true) : prevStartAt.revert(runBackwards && dur ? _revertConfig : _startAtRevertConfig); // if it's a "startAt" (not "from()" or runBackwards: true), we only need to do a shallow revert (keep transforms cached in CSSPlugin)
+      // don't just _removeFromParent(prevStartAt.render(-1, true)) because that'll leave inline styles. We're creating a new _startAt for "startAt" tweens that re-capture things to ensure that if the pre-tween values changed since the tween was created, they're recorded.
+
+      prevStartAt._lazy = 0;
+    }
 
     if (startAt) {
       _removeFromParent(tween._startAt = Tween.set(targets, _setDefaults({
@@ -4793,19 +4918,17 @@ _initTween = function _initTween(tween, time) {
       }, startAt))); //copy the properties/values into a new object to avoid collisions, like var to = {x:0}, from = {x:500}; timeline.fromTo(e, from, to).fromTo(e, to, from);
 
 
+      time < 0 && (_reverting || !immediateRender && !autoRevert) && tween._startAt.revert(_revertConfig); // rare edge case, like if a render is forced in the negative direction of a non-initted tween.
+
       if (immediateRender) {
-        if (time > 0) {
-          autoRevert || (tween._startAt = 0); //tweens that render immediately (like most from() and fromTo() tweens) shouldn't revert when their parent timeline's playhead goes backward past the startTime because the initial render could have happened anytime and it shouldn't be directly correlated to this tween's startTime. Imagine setting up a complex animation where the beginning states of various objects are rendered immediately but the tween doesn't happen for quite some time - if we revert to the starting values as soon as the playhead goes backward past the tween's startTime, it will throw things off visually. Reversion should only happen in Timeline instances where immediateRender was false or when autoRevert is explicitly set to true.
-        } else if (dur && !(time < 0 && prevStartAt)) {
+        if (dur && time <= 0) {
           time && (tween._zTime = time);
           return; //we skip initialization here so that overwriting doesn't occur until the tween actually begins. Otherwise, if you create several immediateRender:true tweens of the same target/properties to drop into a Timeline, the last one created would overwrite the first ones because they didn't get placed into the timeline yet before the first render occurs and kicks in overwriting.
         }
       }
     } else if (runBackwards && dur) {
       //from() tweens must be handled uniquely: their beginning values must be rendered but we don't want overwriting to occur yet (when time is still 0). Wait until the tween actually begins before doing all the routines like overwriting. At that time, we should render at the END of the tween to ensure that things initialize correctly (remember, from() tweens go backwards)
-      if (prevStartAt) {
-        !autoRevert && (tween._startAt = 0);
-      } else {
+      if (!prevStartAt) {
         time && (immediateRender = false); //in rare cases (like if a from() tween runs and then is invalidate()-ed), immediateRender could be true but the initial forced-render gets skipped, so there's no need to force the render in this context when the _time is greater than 0
 
         p = _setDefaults({
@@ -4823,6 +4946,9 @@ _initTween = function _initTween(tween, time) {
 
         _removeFromParent(tween._startAt = Tween.set(targets, p));
 
+        time < 0 && (_reverting ? tween._startAt.revert(_revertConfig) : tween._startAt.render(-1, true));
+        tween._zTime = time;
+
         if (!immediateRender) {
           _initTween(tween._startAt, _tinyNum); //ensures that the initial values are recorded
 
@@ -4832,7 +4958,7 @@ _initTween = function _initTween(tween, time) {
       }
     }
 
-    tween._pt = 0;
+    tween._pt = tween._ptCache = 0;
     lazy = dur && _isNotFalse(lazy) || lazy && !dur;
 
     for (i = 0; i < targets.length; i++) {
@@ -4868,7 +4994,7 @@ _initTween = function _initTween(tween, time) {
       if (autoOverwrite && tween._pt) {
         _overwritingTween = tween;
 
-        _globalTimeline.killTweensOf(target, ptLookup, tween.globalTime(0)); //Also make sure the overwriting doesn't overwrite THIS tween!!!
+        _globalTimeline.killTweensOf(target, ptLookup, tween.globalTime(time)); // make sure the overwriting doesn't overwrite THIS tween!!!
 
 
         overwritten = !tween.parent;
@@ -4882,10 +5008,65 @@ _initTween = function _initTween(tween, time) {
     tween._onInit && tween._onInit(tween); //plugins like RoundProps must wait until ALL of the PropTweens are instantiated. In the plugin's init() function, it sets the _onInit on the tween instance. May not be pretty/intuitive, but it's fast and keeps file size down.
   }
 
-  tween._from = !tl && !!vars.runBackwards; //nested timelines should never run backwards - the backwards-ness is in the child tweens.
-
   tween._onUpdate = onUpdate;
   tween._initted = (!tween._op || tween._pt) && !overwritten; // if overwrittenProps resulted in the entire tween being killed, do NOT flag it as initted or else it may render for one tick.
+
+  keyframes && time <= 0 && tl.render(_bigNum, true, true); // if there's a 0% keyframe, it'll render in the "before" state for any staggered/delayed animations thus when the following tween initializes, it'll use the "before" state instead of the "after" state as the initial values.
+},
+    _updatePropTweens = function _updatePropTweens(tween, property, value, start, startIsRelative, ratio, time) {
+  var ptCache = (tween._pt && tween._ptCache || (tween._ptCache = {}))[property],
+      pt,
+      rootPT,
+      lookup,
+      i;
+
+  if (!ptCache) {
+    ptCache = tween._ptCache[property] = [];
+    lookup = tween._ptLookup;
+    i = tween._targets.length;
+
+    while (i--) {
+      pt = lookup[i][property];
+
+      if (pt && pt.d && pt.d._pt) {
+        // it's a plugin, so find the nested PropTween
+        pt = pt.d._pt;
+
+        while (pt && pt.p !== property && pt.fp !== property) {
+          // "fp" is functionParam for things like setting CSS variables which require .setProperty("--var-name", value)
+          pt = pt._next;
+        }
+      }
+
+      if (!pt) {
+        // there is no PropTween associated with that property, so we must FORCE one to be created and ditch out of this
+        // if the tween has other properties that already rendered at new positions, we'd normally have to rewind to put them back like tween.render(0, true) before forcing an _initTween(), but that can create another edge case like tweening a timeline's progress would trigger onUpdates to fire which could move other things around. It's better to just inform users that .resetTo() should ONLY be used for tweens that already have that property. For example, you can't gsap.to(...{ y: 0 }) and then tween.restTo("x", 200) for example.
+        _forceAllPropTweens = 1; // otherwise, when we _addPropTween() and it finds no change between the start and end values, it skips creating a PropTween (for efficiency...why tween when there's no difference?) but in this case we NEED that PropTween created so we can edit it.
+
+        tween.vars[property] = "+=0";
+
+        _initTween(tween, time);
+
+        _forceAllPropTweens = 0;
+        return 1;
+      }
+
+      ptCache.push(pt);
+    }
+  }
+
+  i = ptCache.length;
+
+  while (i--) {
+    rootPT = ptCache[i];
+    pt = rootPT._pt || rootPT; // complex values may have nested PropTweens. We only accommodate the FIRST value.
+
+    pt.s = (start || start === 0) && !startIsRelative ? start : pt.s + (start || 0) + ratio * pt.c;
+    pt.c = value - pt.s;
+    rootPT.e && (rootPT.e = _round(value) + getUnit(rootPT.e)); // mainly for CSSPlugin (end value)
+
+    rootPT.b && (rootPT.b = pt.s + getUnit(rootPT.b)); // (beginning value)
+  }
 },
     _addAliasesToVars = function _addAliasesToVars(targets, vars) {
   var harness = targets[0] ? _getCache(targets[0]).harness : 0,
@@ -4914,11 +5095,44 @@ _initTween = function _initTween(tween, time) {
 
   return copy;
 },
+    // parses multiple formats, like {"0%": {x: 100}, {"50%": {x: -20}} and { x: {"0%": 100, "50%": -20} }, and an "ease" can be set on any object. We populate an "allProps" object with an Array for each property, like {x: [{}, {}], y:[{}, {}]} with data for each property tween. The objects have a "t" (time), "v", (value), and "e" (ease) property. This allows us to piece together a timeline later.
+_parseKeyframe = function _parseKeyframe(prop, obj, allProps, easeEach) {
+  var ease = obj.ease || easeEach || "power1.inOut",
+      p,
+      a;
+
+  if (_isArray(obj)) {
+    a = allProps[prop] || (allProps[prop] = []); // t = time (out of 100), v = value, e = ease
+
+    obj.forEach(function (value, i) {
+      return a.push({
+        t: i / (obj.length - 1) * 100,
+        v: value,
+        e: ease
+      });
+    });
+  } else {
+    for (p in obj) {
+      a = allProps[p] || (allProps[p] = []);
+      p === "ease" || a.push({
+        t: parseFloat(prop),
+        v: obj[p],
+        e: ease
+      });
+    }
+  }
+},
     _parseFuncOrString = function _parseFuncOrString(value, tween, i, target, targets) {
   return _isFunction(value) ? value.call(tween, i, target, targets) : _isString(value) && ~value.indexOf("random(") ? _replaceRandom(value) : value;
 },
-    _staggerTweenProps = _callbackNames + "repeat,repeatDelay,yoyo,repeatRefresh,yoyoEase",
-    _staggerPropsToSkip = (_staggerTweenProps + ",id,stagger,delay,duration,paused,scrollTrigger").split(",");
+    _staggerTweenProps = _callbackNames + "repeat,repeatDelay,yoyo,repeatRefresh,yoyoEase,autoRevert",
+    _staggerPropsToSkip = {};
+
+exports._checkPlugin = _checkPlugin;
+
+_forEachName(_staggerTweenProps + ",id,stagger,delay,duration,paused,scrollTrigger", function (name) {
+  return _staggerPropsToSkip[name] = 1;
+});
 /*
  * --------------------------------------------------------------------------------------
  * TWEEN
@@ -4926,21 +5140,19 @@ _initTween = function _initTween(tween, time) {
  */
 
 
-exports._checkPlugin = _checkPlugin;
-
 var Tween = /*#__PURE__*/function (_Animation2) {
   _inheritsLoose(Tween, _Animation2);
 
-  function Tween(targets, vars, time, skipInherit) {
+  function Tween(targets, vars, position, skipInherit) {
     var _this3;
 
     if (typeof vars === "number") {
-      time.duration = vars;
-      vars = time;
-      time = null;
+      position.duration = vars;
+      vars = position;
+      position = null;
     }
 
-    _this3 = _Animation2.call(this, skipInherit ? vars : _inheritDefaults(vars), time) || this;
+    _this3 = _Animation2.call(this, skipInherit ? vars : _inheritDefaults(vars)) || this;
     var _this3$vars = _this3.vars,
         duration = _this3$vars.duration,
         delay = _this3$vars.delay,
@@ -4951,7 +5163,7 @@ var Tween = /*#__PURE__*/function (_Animation2) {
         defaults = _this3$vars.defaults,
         scrollTrigger = _this3$vars.scrollTrigger,
         yoyoEase = _this3$vars.yoyoEase,
-        parent = _this3.parent,
+        parent = vars.parent || _globalTimeline,
         parsedTargets = (_isArray(targets) || _isTypedArray(targets) ? _isNumber(targets[0]) : "length" in vars) ? [targets] : toArray(targets),
         tl,
         i,
@@ -4970,23 +5182,17 @@ var Tween = /*#__PURE__*/function (_Animation2) {
       vars = _this3.vars;
       tl = _this3.timeline = new Timeline({
         data: "nested",
-        defaults: defaults || {}
-      });
+        defaults: defaults || {},
+        targets: parent && parent.data === "nested" ? parent.vars.targets : parsedTargets
+      }); // we need to store the targets because for staggers and keyframes, we end up creating an individual tween for each but function-based values need to know the index and the whole Array of targets.
+
       tl.kill();
       tl.parent = tl._dp = _assertThisInitialized(_this3);
       tl._start = 0;
 
-      if (keyframes) {
-        _setDefaults(tl.vars.defaults, {
-          ease: "none"
-        });
-
-        keyframes.forEach(function (frame) {
-          return tl.to(parsedTargets, frame, ">");
-        });
-      } else {
+      if (stagger || _isFuncOrString(duration) || _isFuncOrString(delay)) {
         l = parsedTargets.length;
-        staggerFunc = stagger ? distribute(stagger) : _emptyFunc;
+        staggerFunc = stagger && distribute(stagger);
 
         if (_isObject(stagger)) {
           //users can pass in callbacks like onStart/onComplete in the stagger object. These should fire with each individual tween.
@@ -4999,14 +5205,7 @@ var Tween = /*#__PURE__*/function (_Animation2) {
         }
 
         for (i = 0; i < l; i++) {
-          copy = {};
-
-          for (p in vars) {
-            if (_staggerPropsToSkip.indexOf(p) < 0) {
-              copy[p] = vars[p];
-            }
-          }
-
+          copy = _copyExcluding(vars, _staggerPropsToSkip);
           copy.stagger = 0;
           yoyoEase && (copy.yoyoEase = yoyoEase);
           staggerVarsToMerge && _merge(copy, staggerVarsToMerge);
@@ -5022,10 +5221,56 @@ var Tween = /*#__PURE__*/function (_Animation2) {
             copy.delay = 0;
           }
 
-          tl.to(curTarget, copy, staggerFunc(i, curTarget, parsedTargets));
+          tl.to(curTarget, copy, staggerFunc ? staggerFunc(i, curTarget, parsedTargets) : 0);
+          tl._ease = _easeMap.none;
         }
 
         tl.duration() ? duration = delay = 0 : _this3.timeline = 0; // if the timeline's duration is 0, we don't need a timeline internally!
+      } else if (keyframes) {
+        _inheritDefaults(_setDefaults(tl.vars.defaults, {
+          ease: "none"
+        }));
+
+        tl._ease = _parseEase(keyframes.ease || vars.ease || "none");
+        var time = 0,
+            a,
+            kf,
+            v;
+
+        if (_isArray(keyframes)) {
+          keyframes.forEach(function (frame) {
+            return tl.to(parsedTargets, frame, ">");
+          });
+          tl.duration(); // to ensure tl._dur is cached because we tap into it for performance purposes in the render() method.
+        } else {
+          copy = {};
+
+          for (p in keyframes) {
+            p === "ease" || p === "easeEach" || _parseKeyframe(p, keyframes[p], copy, keyframes.easeEach);
+          }
+
+          for (p in copy) {
+            a = copy[p].sort(function (a, b) {
+              return a.t - b.t;
+            });
+            time = 0;
+
+            for (i = 0; i < a.length; i++) {
+              kf = a[i];
+              v = {
+                ease: kf.e,
+                duration: (kf.t - (i ? a[i - 1].t : 0)) / 100 * duration
+              };
+              v[p] = kf.v;
+              tl.to(parsedTargets, v, time);
+              time += v.duration;
+            }
+          }
+
+          tl.duration() < duration && tl.to({}, {
+            duration: duration - tl.duration()
+          }); // in case keyframes didn't go to 100%
+        }
       }
 
       duration || _this3.duration(duration = tl.duration());
@@ -5041,9 +5286,12 @@ var Tween = /*#__PURE__*/function (_Animation2) {
       _overwritingTween = 0;
     }
 
-    parent && _postAddChecks(parent, _assertThisInitialized(_this3));
+    _addToTimeline(parent, _assertThisInitialized(_this3), position);
 
-    if (immediateRender || !duration && !keyframes && _this3._start === _round(parent._time) && _isNotFalse(immediateRender) && _hasNoPausedAncestors(_assertThisInitialized(_this3)) && parent.data !== "nested") {
+    vars.reversed && _this3.reverse();
+    vars.paused && _this3.paused(true);
+
+    if (immediateRender || !duration && !keyframes && _this3._start === _roundPrecise(parent._time) && _isNotFalse(immediateRender) && _hasNoPausedAncestors(_assertThisInitialized(_this3)) && parent.data !== "nested") {
       _this3._tTime = -_tinyNum; //forces a render without having to set the render() "force" parameter to true because we want to allow lazying by default (using the "force" parameter always forces an immediate full render)
 
       _this3.render(Math.max(0, -delay)); //in case delay is negative
@@ -5060,7 +5308,8 @@ var Tween = /*#__PURE__*/function (_Animation2) {
     var prevTime = this._time,
         tDur = this._tDur,
         dur = this._dur,
-        tTime = totalTime > tDur - _tinyNum && totalTime >= 0 ? tDur : totalTime < _tinyNum ? 0 : totalTime,
+        isNegative = totalTime < 0,
+        tTime = totalTime > tDur - _tinyNum && !isNegative ? tDur : totalTime < _tinyNum ? 0 : totalTime,
         time,
         pt,
         iteration,
@@ -5073,7 +5322,7 @@ var Tween = /*#__PURE__*/function (_Animation2) {
 
     if (!dur) {
       _renderZeroDurationTween(this, totalTime, suppressEvents, force);
-    } else if (tTime !== this._tTime || !totalTime || force || !this._initted && this._tTime || this._startAt && this._zTime < 0 !== totalTime < 0) {
+    } else if (tTime !== this._tTime || !totalTime || force || !this._initted && this._tTime || this._startAt && this._zTime < 0 !== isNegative) {
       //this senses if we're crossing over the start time, in which case we must record _zTime and force the render, but we do it in this lengthy conditional way for performance reasons (usually we can skip the calculations): this._initted && (this._zTime < 0) !== (totalTime < 0)
       time = tTime;
       timeline = this.timeline;
@@ -5082,11 +5331,11 @@ var Tween = /*#__PURE__*/function (_Animation2) {
         //adjust the time for repeats and yoyos
         cycleDuration = dur + this._rDelay;
 
-        if (this._repeat < -1 && totalTime < 0) {
+        if (this._repeat < -1 && isNegative) {
           return this.totalTime(cycleDuration * 100 + totalTime, suppressEvents, force);
         }
 
-        time = _round(tTime % cycleDuration); //round to avoid floating point errors. (4 % 0.8 should be 0 but some browsers report it as 0.79999999!)
+        time = _roundPrecise(tTime % cycleDuration); //round to avoid floating point errors. (4 % 0.8 should be 0 but some browsers report it as 0.79999999!)
 
         if (tTime === tDur) {
           // the tDur === tTime is for edge cases where there's a lengthy decimal on the duration and it may reach the very end but the time is rendered as not-quite-there (remember, tDur is rounded to 4 decimals whereas dur isn't)
@@ -5114,6 +5363,7 @@ var Tween = /*#__PURE__*/function (_Animation2) {
 
         if (time === prevTime && !force && this._initted) {
           //could be during the repeatDelay part. No need to render and fire callbacks.
+          this._tTime = tTime;
           return this;
         }
 
@@ -5123,15 +5373,20 @@ var Tween = /*#__PURE__*/function (_Animation2) {
           if (this.vars.repeatRefresh && !isYoyo && !this._lock) {
             this._lock = force = 1; //force, otherwise if lazy is true, the _attemptInitTween() will return and we'll jump out and get caught bouncing on each tick.
 
-            this.render(_round(cycleDuration * iteration), true).invalidate()._lock = 0;
+            this.render(_roundPrecise(cycleDuration * iteration), true).invalidate()._lock = 0;
           }
         }
       }
 
       if (!this._initted) {
-        if (_attemptInitTween(this, totalTime < 0 ? totalTime : time, force, suppressEvents)) {
+        if (_attemptInitTween(this, isNegative ? totalTime : time, force, suppressEvents)) {
           this._tTime = 0; // in constructor if immediateRender is true, we set _tTime to -_tinyNum to have the playhead cross the starting point but we can't leave _tTime as a negative number.
 
+          return this;
+        }
+
+        if (prevTime !== this._time) {
+          // rare edge case - during initialization, an onUpdate in the _startAt (.fromTo()) might force this tween to render at a different spot in which case we should ditch this render() call so that it doesn't revert the values.
           return this;
         }
 
@@ -5156,7 +5411,15 @@ var Tween = /*#__PURE__*/function (_Animation2) {
         this.ratio = ratio = 1 - ratio;
       }
 
-      time && !prevTime && !suppressEvents && _callback(this, "onStart");
+      if (time && !prevTime && !suppressEvents) {
+        _callback(this, "onStart");
+
+        if (this._tTime !== tTime) {
+          // in case the onStart triggered a render at a different spot, eject. Like if someone did animation.pause(0.5) or something inside the onStart.
+          return this;
+        }
+      }
+
       pt = this._pt;
 
       while (pt) {
@@ -5164,10 +5427,10 @@ var Tween = /*#__PURE__*/function (_Animation2) {
         pt = pt._next;
       }
 
-      timeline && timeline.render(totalTime < 0 ? totalTime : !time && isYoyo ? -_tinyNum : timeline._dur * ratio, suppressEvents, force) || this._startAt && (this._zTime = totalTime);
+      timeline && timeline.render(totalTime < 0 ? totalTime : !time && isYoyo ? -_tinyNum : timeline._dur * timeline._ease(time / this._dur), suppressEvents, force) || this._startAt && (this._zTime = totalTime);
 
       if (this._onUpdate && !suppressEvents) {
-        totalTime < 0 && this._startAt && this._startAt.render(totalTime, true, force); //note: for performance reasons, we tuck this conditional logic inside less traveled areas (most tweens don't have an onUpdate). We'd just have it at the end before the onComplete, but the values should be updated before any onUpdate is called, so we ALSO put it here and then if it's not called, we do so later near the onComplete.
+        isNegative && _rewindStartAt(this, totalTime, suppressEvents, force); //note: for performance reasons, we tuck this conditional logic inside less traveled areas (most tweens don't have an onUpdate). We'd just have it at the end before the onComplete, but the values should be updated before any onUpdate is called, so we ALSO put it here and then if it's not called, we do so later near the onComplete.
 
         _callback(this, "onUpdate");
       }
@@ -5175,10 +5438,10 @@ var Tween = /*#__PURE__*/function (_Animation2) {
       this._repeat && iteration !== prevIteration && this.vars.onRepeat && !suppressEvents && this.parent && _callback(this, "onRepeat");
 
       if ((tTime === this._tDur || !tTime) && this._tTime === tTime) {
-        totalTime < 0 && this._startAt && !this._onUpdate && this._startAt.render(totalTime, true, true);
+        isNegative && !this._onUpdate && _rewindStartAt(this, totalTime, true, true);
         (totalTime || !dur) && (tTime === this._tDur && this._ts > 0 || !tTime && this._ts < 0) && _removeFromParent(this, 1); // don't remove if we're rendering at exactly a time of 0, as there could be autoRevert values that should get set on the next tick (if the playhead goes backward beyond the startTime, negative totalTime). Don't remove if the timeline is reversed and the playhead isn't at 0, otherwise tl.progress(1).reverse() won't work. Only remove if the playhead is at the end and timeScale is positive, or if the playhead is at 0 and the timeScale is negative.
 
-        if (!suppressEvents && !(totalTime < 0 && !prevTime) && (tTime || prevTime)) {
+        if (!suppressEvents && !(isNegative && !prevTime) && (tTime || prevTime)) {
           // if prevTime and tTime are zero, we shouldn't fire the onReverseComplete. This could happen if you gsap.to(... {paused:true}).play();
           _callback(this, tTime === tDur ? "onComplete" : "onReverseComplete", true);
 
@@ -5199,6 +5462,33 @@ var Tween = /*#__PURE__*/function (_Animation2) {
     this._ptLookup = [];
     this.timeline && this.timeline.invalidate();
     return _Animation2.prototype.invalidate.call(this);
+  };
+
+  _proto3.resetTo = function resetTo(property, value, start, startIsRelative) {
+    _tickerActive || _ticker.wake();
+    this._ts || this.play();
+    var time = Math.min(this._dur, (this._dp._time - this._start) * this._ts),
+        ratio;
+    this._initted || _initTween(this, time);
+    ratio = this._ease(time / this._dur); // don't just get tween.ratio because it may not have rendered yet.
+    // possible future addition to allow an object with multiple values to update, like tween.resetTo({x: 100, y: 200}); At this point, it doesn't seem worth the added kb given the fact that most users will likely opt for the convenient gsap.quickTo() way of interacting with this method.
+    // if (_isObject(property)) { // performance optimization
+    // 	for (p in property) {
+    // 		if (_updatePropTweens(this, p, property[p], value ? value[p] : null, start, ratio, time)) {
+    // 			return this.resetTo(property, value, start, startIsRelative); // if a PropTween wasn't found for the property, it'll get forced with a re-initialization so we need to jump out and start over again.
+    // 		}
+    // 	}
+    // } else {
+
+    if (_updatePropTweens(this, property, value, start, startIsRelative, ratio, time)) {
+      return this.resetTo(property, value, start, startIsRelative); // if a PropTween wasn't found for the property, it'll get forced with a re-initialization so we need to jump out and start over again.
+    } //}
+
+
+    _alignPlayhead(this, 0);
+
+    this.parent || _addLinkedListItem(this._dp, this, "_first", "_last", this._dp._sort ? "_start" : 0);
+    return this.render(0);
   };
 
   _proto3.kill = function kill(targets, vars) {
@@ -5297,7 +5587,7 @@ var Tween = /*#__PURE__*/function (_Animation2) {
   };
 
   Tween.from = function from(targets, vars) {
-    return new Tween(targets, _parseVars(arguments, 1));
+    return _createTweenType(1, arguments);
   };
 
   Tween.delayedCall = function delayedCall(delay, callback, params, scope) {
@@ -5311,11 +5601,11 @@ var Tween = /*#__PURE__*/function (_Animation2) {
       onCompleteParams: params,
       onReverseCompleteParams: params,
       callbackScope: scope
-    });
+    }); // we must use onReverseComplete too for things like timeline.add(() => {...}) which should be triggered in BOTH directions (forward and reverse)
   };
 
   Tween.fromTo = function fromTo(targets, fromVars, toVars) {
-    return new Tween(targets, _parseVars(arguments, 2));
+    return _createTweenType(2, arguments);
   };
 
   Tween.set = function set(targets, vars) {
@@ -5381,7 +5671,7 @@ var _setterPlain = function _setterPlain(target, property, value) {
   return _isFunction(target[property]) ? _setterFunc : _isUndefined(target[property]) && target.setAttribute ? _setterAttribute : _setterPlain;
 },
     _renderPlain = function _renderPlain(ratio, data) {
-  return data.set(data.t, data.p, Math.round((data.s + data.c * ratio) * 10000) / 10000, data);
+  return data.set(data.t, data.p, Math.round((data.s + data.c * ratio) * 1000000) / 1000000, data);
 },
     _renderBoolean = function _renderBoolean(ratio, data) {
   return data.set(data.t, data.p, !!(data.s + data.c * ratio), data);
@@ -5535,11 +5825,230 @@ _globalTimeline = new Timeline({
   smoothChildTiming: true
 });
 _config.stringFilter = _colorStringFilter;
+
+var _media = [],
+    _listeners = {},
+    _emptyArray = [],
+    _lastMediaTime = 0,
+    _dispatch = function _dispatch(type) {
+  return (_listeners[type] || _emptyArray).map(function (f) {
+    return f();
+  });
+},
+    _onMediaChange = function _onMediaChange() {
+  var time = Date.now(),
+      matches = [];
+
+  if (time - _lastMediaTime > 2) {
+    _dispatch("matchMediaInit");
+
+    _media.forEach(function (c) {
+      var queries = c.queries,
+          conditions = c.conditions,
+          match,
+          p,
+          anyMatch,
+          toggled;
+
+      for (p in queries) {
+        match = _win.matchMedia(queries[p]).matches; // Firefox doesn't update the "matches" property of the MediaQueryList object correctly - it only does so as it calls its change handler - so we must re-create a media query here to ensure it's accurate.
+
+        match && (anyMatch = 1);
+
+        if (match !== conditions[p]) {
+          conditions[p] = match;
+          toggled = 1;
+        }
+      }
+
+      if (toggled) {
+        c.revert();
+        anyMatch && matches.push(c);
+      }
+    });
+
+    _dispatch("matchMediaRevert");
+
+    matches.forEach(function (c) {
+      return c.onMatch(c);
+    });
+    _lastMediaTime = time;
+
+    _dispatch("matchMedia");
+  }
+};
+
+var Context = /*#__PURE__*/function () {
+  function Context(func, scope) {
+    this.selector = scope && selector(scope);
+    this.data = [];
+    this._r = []; // returned/cleanup functions
+
+    this.isReverted = false;
+    func && this.add(func);
+  }
+
+  var _proto5 = Context.prototype;
+
+  _proto5.add = function add(name, func, scope) {
+    if (_isFunction(name)) {
+      scope = func;
+      func = name;
+      name = _isFunction;
+    }
+
+    var self = this,
+        f = function f() {
+      var prev = _context,
+          prevSelector = self.selector,
+          result;
+      prev && prev !== self && prev.data.push(self);
+      scope && (self.selector = selector(scope));
+      _context = self;
+      result = func.apply(self, arguments);
+      _isFunction(result) && self._r.push(result);
+      _context = prev;
+      self.selector = prevSelector;
+      self.isReverted = false;
+      return result;
+    };
+
+    self.last = f;
+    return name === _isFunction ? f(self) : name ? self[name] = f : f;
+  };
+
+  _proto5.ignore = function ignore(func) {
+    var prev = _context;
+    _context = null;
+    func(this);
+    _context = prev;
+  };
+
+  _proto5.getTweens = function getTweens() {
+    var a = [];
+    this.data.forEach(function (e) {
+      return e instanceof Context ? a.push.apply(a, e.getTweens()) : e instanceof Tween && a.push(e);
+    });
+    return a;
+  };
+
+  _proto5.clear = function clear() {
+    this._r.length = this.data.length = 0;
+  };
+
+  _proto5.kill = function kill(revert, matchMedia) {
+    var _this4 = this;
+
+    if (revert) {
+      // save as an object so that we can cache the globalTime for each tween to optimize performance during the sort
+      this.getTweens().map(function (t) {
+        return {
+          g: t.globalTime(0),
+          t: t
+        };
+      }).sort(function (a, b) {
+        return b.g - a.g || -1;
+      }).forEach(function (o) {
+        return o.t.revert(revert);
+      }); // note: all of the _startAt tweens should be reverted in reverse order that thy were created, and they'll all have the same globalTime (-1) so the " || -1" in the sort keeps the order properly.
+
+      this.data.forEach(function (e) {
+        return !(e instanceof Animation) && e.revert && e.revert(revert);
+      });
+
+      this._r.forEach(function (f) {
+        return f(revert, _this4);
+      });
+
+      this.isReverted = true;
+    } else {
+      this.data.forEach(function (e) {
+        return e.kill && e.kill();
+      });
+    }
+
+    this.clear();
+
+    if (matchMedia) {
+      var i = _media.indexOf(this);
+
+      !!~i && _media.splice(i, 1);
+    }
+  };
+
+  _proto5.revert = function revert(config) {
+    this.kill(config || {});
+  };
+
+  return Context;
+}();
+
+var MatchMedia = /*#__PURE__*/function () {
+  function MatchMedia(scope) {
+    this.contexts = [];
+    this.scope = scope;
+  }
+
+  var _proto6 = MatchMedia.prototype;
+
+  _proto6.add = function add(conditions, func, scope) {
+    _isObject(conditions) || (conditions = {
+      matches: conditions
+    });
+    var context = new Context(0, scope || this.scope),
+        cond = context.conditions = {},
+        mq,
+        p,
+        active;
+    this.contexts.push(context);
+    func = context.add("onMatch", func);
+    context.queries = conditions;
+
+    for (p in conditions) {
+      if (p === "all") {
+        active = 1;
+      } else {
+        mq = _win.matchMedia(conditions[p]);
+
+        if (mq) {
+          _media.indexOf(context) < 0 && _media.push(context);
+          (cond[p] = mq.matches) && (active = 1);
+          mq.addListener ? mq.addListener(_onMediaChange) : mq.addEventListener("change", _onMediaChange);
+        }
+      }
+    }
+
+    active && func(context);
+    return this;
+  } // refresh() {
+  // 	let time = _lastMediaTime,
+  // 		media = _media;
+  // 	_lastMediaTime = -1;
+  // 	_media = this.contexts;
+  // 	_onMediaChange();
+  // 	_lastMediaTime = time;
+  // 	_media = media;
+  // }
+  ;
+
+  _proto6.revert = function revert(config) {
+    this.kill(config || {});
+  };
+
+  _proto6.kill = function kill(revert) {
+    this.contexts.forEach(function (c) {
+      return c.kill(revert, true);
+    });
+  };
+
+  return MatchMedia;
+}();
 /*
  * --------------------------------------------------------------------------------------
  * GSAP
  * --------------------------------------------------------------------------------------
  */
+
 
 var _gsap = {
   registerPlugin: function registerPlugin() {
@@ -5603,6 +6112,17 @@ var _gsap = {
       return setter(target, p, unit ? value + unit : value, cache, 1);
     };
   },
+  quickTo: function quickTo(target, property, vars) {
+    var _merge2;
+
+    var tween = gsap.to(target, _merge((_merge2 = {}, _merge2[property] = "+=0.1", _merge2.paused = true, _merge2), vars || {})),
+        func = function func(value, start, startIsRelative) {
+      return tween.resetTo(property, value, start, startIsRelative);
+    };
+
+    func.tween = tween;
+    return func;
+  },
   isTweening: function isTweening(targets) {
     return _globalTimeline.getTweensOf(targets, true).length > 0;
   },
@@ -5613,12 +6133,12 @@ var _gsap = {
   config: function config(value) {
     return _mergeDeep(_config, value || {});
   },
-  registerEffect: function registerEffect(_ref2) {
-    var name = _ref2.name,
-        effect = _ref2.effect,
-        plugins = _ref2.plugins,
-        defaults = _ref2.defaults,
-        extendTimeline = _ref2.extendTimeline;
+  registerEffect: function registerEffect(_ref3) {
+    var name = _ref3.name,
+        effect = _ref3.effect,
+        plugins = _ref3.plugins,
+        defaults = _ref3.defaults,
+        extendTimeline = _ref3.extendTimeline;
     (plugins || "").split(",").forEach(function (pluginName) {
       return pluginName && !_plugins[pluginName] && !_globals[pluginName] && _warn(name + " effect requires " + pluginName + " plugin.");
     });
@@ -5673,6 +6193,37 @@ var _gsap = {
 
     return tl;
   },
+  context: function context(func, scope) {
+    return func ? new Context(func, scope) : _context;
+  },
+  matchMedia: function matchMedia(scope) {
+    return new MatchMedia(scope);
+  },
+  matchMediaRefresh: function matchMediaRefresh() {
+    return _media.forEach(function (c) {
+      var cond = c.conditions,
+          found,
+          p;
+
+      for (p in cond) {
+        if (cond[p]) {
+          cond[p] = false;
+          found = 1;
+        }
+      }
+
+      found && c.revert();
+    }) || _onMediaChange();
+  },
+  addEventListener: function addEventListener(type, callback) {
+    var a = _listeners[type] || (_listeners[type] = []);
+    ~a.indexOf(callback) || a.push(callback);
+  },
+  removeEventListener: function removeEventListener(type, callback) {
+    var a = _listeners[type],
+        i = a && a.indexOf(callback);
+    i >= 0 && a.splice(i, 1);
+  },
   utils: {
     wrap: wrap,
     wrapYoyo: wrapYoyo,
@@ -5684,6 +6235,7 @@ var _gsap = {
     clamp: clamp,
     splitColor: splitColor,
     toArray: toArray,
+    selector: selector,
     mapRange: mapRange,
     pipe: pipe,
     unitize: unitize,
@@ -5704,6 +6256,18 @@ var _gsap = {
     Animation: Animation,
     getCache: _getCache,
     _removeLinkedListItem: _removeLinkedListItem,
+    reverting: function reverting() {
+      return _reverting;
+    },
+    context: function context(toAdd) {
+      if (toAdd && _context) {
+        _context.data.push(toAdd);
+
+        toAdd._ctx = _context;
+      }
+
+      return _context;
+    },
     suppressOverwrites: function suppressOverwrites(value) {
       return _suppressOverwrites = value;
     }
@@ -5792,13 +6356,25 @@ var _getPluginPropTween = function _getPluginPropTween(plugin, prop) {
 var gsap = _gsap.registerPlugin({
   name: "attr",
   init: function init(target, vars, tween, index, targets) {
-    var p, pt;
+    var p, pt, v;
+    this.tween = tween;
 
     for (p in vars) {
-      pt = this.add(target, "setAttribute", (target.getAttribute(p) || 0) + "", vars[p], index, targets, 0, 0, p);
-      pt && (pt.op = p);
+      v = target.getAttribute(p) || "";
+      pt = this.add(target, "setAttribute", (v || 0) + "", vars[p], index, targets, 0, 0, p);
+      pt.op = p;
+      pt.b = v; // record the beginning value so we can revert()
 
       this._props.push(p);
+    }
+  },
+  render: function render(ratio, data) {
+    var pt = data._pt;
+
+    while (pt) {
+      _reverting ? pt.set(pt.t, pt.p, pt.b, pt) : pt.r(ratio, pt.d); // if reverting, go back to the original (pt.b)
+
+      pt = pt._next;
     }
   }
 }, {
@@ -5807,20 +6383,16 @@ var gsap = _gsap.registerPlugin({
     var i = value.length;
 
     while (i--) {
-      this.add(target, i, target[i] || 0, value[i]);
+      this.add(target, i, target[i] || 0, value[i], 0, 0, 0, 0, 0, 1);
     }
   }
 }, _buildModifierPlugin("roundProps", _roundModifier), _buildModifierPlugin("modifiers"), _buildModifierPlugin("snap", snap)) || _gsap; //to prevent the core plugins from being dropped via aggressive tree shaking, we must include them in the variable declaration in this way.
 
 
 exports.default = exports.gsap = gsap;
-Tween.version = Timeline.version = gsap.version = "3.6.0";
+Tween.version = Timeline.version = gsap.version = "3.11.1";
 _coreReady = 1;
-
-if (_windowExists()) {
-  _wake();
-}
-
+_windowExists() && _wake();
 var Power0 = _easeMap.Power0,
     Power1 = _easeMap.Power1,
     Power2 = _easeMap.Power2,
@@ -5863,15 +6435,15 @@ exports.Power0 = Power0;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.checkPrefix = exports._createElement = exports._getBBox = exports.default = exports.CSSPlugin = void 0;
+exports.default = exports.checkPrefix = exports._getBBox = exports._createElement = exports.CSSPlugin = void 0;
 
 var _gsapCore = require("./gsap-core.js");
 
 /*!
- * CSSPlugin 3.6.0
+ * CSSPlugin 3.11.1
  * https://greensock.com
  *
- * Copyright 2008-2021, GreenSock. All rights reserved.
+ * Copyright 2008-2022, GreenSock. All rights reserved.
  * Subject to the terms at https://greensock.com/standard-license or for
  * Club GreenSock members, the agreement issued with that membership.
  * @author: Jack Doyle, jack@greensock.com
@@ -5885,6 +6457,7 @@ var _win,
     _tempDiv,
     _tempDivStyler,
     _recentSetterPlugin,
+    _reverting,
     _windowExists = function _windowExists() {
   return typeof window !== "undefined";
 },
@@ -5894,7 +6467,7 @@ var _win,
     _atan2 = Math.atan2,
     _bigNum = 1e8,
     _capsExp = /([A-Z])/g,
-    _horizontalExp = /(?:left|right|width|margin|padding|x)/i,
+    _horizontalExp = /(left|right|width|margin|padding|x)/i,
     _complexExp = /[\s,\(]\S/,
     _propertyAliases = {
   autoAlpha: "opacity,visibility",
@@ -5945,6 +6518,86 @@ _renderRoundedCSSProp = function _renderRoundedCSSProp(ratio, data) {
 },
     _transformProp = "transform",
     _transformOriginProp = _transformProp + "Origin",
+    _saveStyle = function _saveStyle(property) {
+  var _this = this;
+
+  var target = this.target,
+      style = target.style;
+
+  if (property in _transformProps) {
+    this.tfm = this.tfm || {};
+
+    if (property !== "transform") {
+      property = _propertyAliases[property] || property;
+      ~property.indexOf(",") ? property.split(",").forEach(function (a) {
+        return _this.tfm[a] = _get(target, a);
+      }) : this.tfm[property] = target._gsap.x ? target._gsap[property] : _get(target, property); // note: scale would map to "scaleX,scaleY", thus we loop and apply them both.
+    }
+
+    if (this.props.indexOf(_transformProp) >= 0) {
+      return;
+    }
+
+    if (target._gsap.svg) {
+      this.svgo = target.getAttribute("data-svg-origin");
+      this.props.push(_transformOriginProp, "");
+    }
+
+    property = _transformProp;
+  }
+
+  style && this.props.push(property, style[property]);
+},
+    _removeIndependentTransforms = function _removeIndependentTransforms(style) {
+  if (style.translate) {
+    style.removeProperty("translate");
+    style.removeProperty("scale");
+    style.removeProperty("rotate");
+  }
+},
+    _revertStyle = function _revertStyle() {
+  var props = this.props,
+      target = this.target,
+      style = target.style,
+      cache = target._gsap,
+      i,
+      p;
+
+  for (i = 0; i < props.length; i += 2) {
+    props[i + 1] ? style[props[i]] = props[i + 1] : style.removeProperty(props[i].replace(_capsExp, "-$1").toLowerCase());
+  }
+
+  if (this.tfm) {
+    for (p in this.tfm) {
+      cache[p] = this.tfm[p];
+    }
+
+    if (cache.svg) {
+      cache.renderTransform();
+      target.setAttribute("data-svg-origin", this.svgo || "");
+    }
+
+    i = _reverting();
+
+    if (i && !i.isStart && !style[_transformProp]) {
+      _removeIndependentTransforms(style);
+
+      cache.uncache = 1; // if it's a startAt that's being reverted in the _initTween() of the core, we don't need to uncache transforms. This is purely a performance optimization.
+    }
+  }
+},
+    _getStyleSaver = function _getStyleSaver(target, properties) {
+  var saver = {
+    target: target,
+    props: [],
+    revert: _revertStyle,
+    save: _saveStyle
+  };
+  properties && properties.split(",").forEach(function (p) {
+    return saver.save(p);
+  });
+  return saver;
+},
     _supports3D,
     _createElement = function _createElement(type, ns) {
   var e = _doc.createElementNS ? _doc.createElementNS((ns || "http://www.w3.org/1999/xhtml").replace(/^https/, "http"), type) : _doc.createElement(type); //some servers swap in https for http in the namespace which can break things, making "style" inaccessible.
@@ -5985,6 +6638,7 @@ _renderRoundedCSSProp = function _renderRoundedCSSProp(ratio, data) {
     _tempDiv.style.cssText = "border-width:0;line-height:0;position:absolute;padding:0"; //make sure to override certain properties that may contaminate measurements, in case the user has overreaching style sheets.
 
     _supports3D = !!_checkPropPrefix("perspective");
+    _reverting = _gsapCore.gsap.core.reverting;
     _pluginInitted = 1;
   }
 },
@@ -6092,6 +6746,10 @@ _removeProperty = function _removeProperty(target, property) {
   rad: 1,
   turn: 1
 },
+    _nonStandardLayouts = {
+  grid: 1,
+  flex: 1
+},
     //takes a single value like 20px and converts it to the unit specified, like "%", returning only the numeric amount.
 _convertToUnit = function _convertToUnit(target, property, value, unit) {
   var curValue = parseFloat(value) || 0,
@@ -6134,10 +6792,10 @@ _convertToUnit = function _convertToUnit(target, property, value, unit) {
 
   cache = parent._gsap;
 
-  if (cache && toPercent && cache.width && horizontal && cache.time === _gsapCore._ticker.time) {
+  if (cache && toPercent && cache.width && horizontal && cache.time === _gsapCore._ticker.time && !cache.uncache) {
     return (0, _gsapCore._round)(curValue / cache.width * amount);
   } else {
-    (toPercent || curUnit === "%") && (style.position = _getComputedProperty(target, "position"));
+    (toPercent || curUnit === "%") && !_nonStandardLayouts[_getComputedProperty(parent, "display")] && (style.position = _getComputedProperty(target, "position"));
     parent === target && (style.position = "static"); // like for borderRadius, if it's a % we must have it relative to the target itself but that may not have position: relative or position: absolute in which case it'd go up the chain until it finds its offsetParent (bad). position: static protects against that.
 
     parent.appendChild(_tempDiv);
@@ -6168,7 +6826,7 @@ _convertToUnit = function _convertToUnit(target, property, value, unit) {
 
   if (_transformProps[property] && property !== "transform") {
     value = _parseTransform(target, uncache);
-    value = property !== "transformOrigin" ? value[property] : _firstTwoOnly(_getComputedProperty(target, _transformOriginProp)) + " " + value.zOrigin + "px";
+    value = property !== "transformOrigin" ? value[property] : value.svg ? value.origin : _firstTwoOnly(_getComputedProperty(target, _transformOriginProp)) + " " + value.zOrigin + "px";
   } else {
     value = target.style[property];
 
@@ -6180,7 +6838,7 @@ _convertToUnit = function _convertToUnit(target, property, value, unit) {
   return unit && !~(value + "").trim().indexOf(" ") ? _convertToUnit(target, property, value, unit) + unit : value;
 },
     _tweenComplexCSSString = function _tweenComplexCSSString(target, prop, start, end) {
-  //note: we call _tweenComplexCSSString.call(pluginInstance...) to ensure that it's scoped properly. We may call it from within a plugin too, thus "this" would refer to the plugin.
+  // note: we call _tweenComplexCSSString.call(pluginInstance...) to ensure that it's scoped properly. We may call it from within a plugin too, thus "this" would refer to the plugin.
   if (!start || start === "none") {
     // some browsers like Safari actually PREFER the prefixed property and mis-report the unprefixed value like clipPath (BUG). In other words, even though clipPath exists in the style ("clipPath" in target.style) and it's set in the CSS properly (along with -webkit-clip-path), Safari reports clipPath as "none" whereas WebkitClipPath reports accurately like "ellipse(100% 0% at 50% 0%)", so in this case we must SWITCH to using the prefixed property instead. See https://greensock.com/forums/topic/18310-clippath-doesnt-work-on-ios/
     var p = _checkPropPrefix(prop, target, 1),
@@ -6208,11 +6866,10 @@ _convertToUnit = function _convertToUnit(target, property, value, unit) {
       chunk,
       endUnit,
       startUnit,
-      relative,
       endValues;
   pt.b = start;
   pt.e = end;
-  start += ""; //ensure values are strings
+  start += ""; // ensure values are strings
 
   end += "";
 
@@ -6223,7 +6880,7 @@ _convertToUnit = function _convertToUnit(target, property, value, unit) {
   }
 
   a = [start, end];
-  (0, _gsapCore._colorStringFilter)(a); //pass an array with the starting and ending values and let the filter do whatever it needs to the values. If colors are found, it returns true and then we must match where the color shows up order-wise because for things like boxShadow, sometimes the browser provides the computed values with the color FIRST, but the user provides it with the color LAST, so flip them if necessary. Same for drop-shadow().
+  (0, _gsapCore._colorStringFilter)(a); // pass an array with the starting and ending values and let the filter do whatever it needs to the values. If colors are found, it returns true and then we must match where the color shows up order-wise because for things like boxShadow, sometimes the browser provides the computed values with the color FIRST, but the user provides it with the color LAST, so flip them if necessary. Same for drop-shadow().
 
   start = a[0];
   end = a[1];
@@ -6244,12 +6901,7 @@ _convertToUnit = function _convertToUnit(target, property, value, unit) {
       if (endValue !== (startValue = startValues[matchIndex++] || "")) {
         startNum = parseFloat(startValue) || 0;
         startUnit = startValue.substr((startNum + "").length);
-        relative = endValue.charAt(1) === "=" ? +(endValue.charAt(0) + "1") : 0;
-
-        if (relative) {
-          endValue = endValue.substr(2);
-        }
-
+        endValue.charAt(1) === "=" && (endValue = (0, _gsapCore._parseRelative)(startNum, endValue) + startUnit);
         endNum = parseFloat(endValue);
         endUnit = endValue.substr((endNum + "").length);
         index = _gsapCore._numWithUnitExp.lastIndex - endUnit.length;
@@ -6266,7 +6918,7 @@ _convertToUnit = function _convertToUnit(target, property, value, unit) {
 
         if (startUnit !== endUnit) {
           startNum = _convertToUnit(target, prop, startValue, endUnit) || 0;
-        } //these nested PropTweens are handled in a special way - we'll never actually call a render or setter method on them. We'll just loop through them in the parent complex string PropTween's render method.
+        } // these nested PropTweens are handled in a special way - we'll never actually call a render or setter method on them. We'll just loop through them in the parent complex string PropTween's render method.
 
 
         pt._pt = {
@@ -6274,7 +6926,7 @@ _convertToUnit = function _convertToUnit(target, property, value, unit) {
           p: chunk || matchIndex === 1 ? chunk : ",",
           //note: SVG spec allows omission of comma/space when a negative sign is wedged between two numbers, like 2.5-5.3 instead of 2.5,-5.3 but when tweening, the negative value may switch to positive, so we insert the comma just in case.
           s: startNum,
-          c: relative ? relative * endNum : endNum - startNum,
+          c: endNum - startNum,
           m: color && color < 4 || prop === "zIndex" ? Math.round : 0
         };
       }
@@ -6353,6 +7005,8 @@ _convertToUnit = function _convertToUnit(target, property, value, unit) {
 
 
         cache.uncache = 1;
+
+        _removeIndependentTransforms(style);
       }
     }
   }
@@ -6477,7 +7131,7 @@ _identity2DMatrix = [1, 0, 0, 1, 0, 0],
       // note: in 3.3.0 we switched target.offsetParent to _doc.body.contains(target) to avoid [sometimes unnecessary] MutationObserver calls but that wasn't adequate because there are edge cases where nested position: fixed elements need to get reparented to accurately sense transforms. See https://github.com/greensock/GSAP/issues/388 and https://github.com/greensock/GSAP/issues/375
       addedToDOM = 1; //flag
 
-      nextSibling = target.nextSibling;
+      nextSibling = target.nextElementSibling;
 
       _docElement.appendChild(target); //we must add it to the DOM in order to get values properly
 
@@ -6565,6 +7219,7 @@ _identity2DMatrix = [1, 0, 0, 1, 0, 0],
       invertedScaleX = cache.scaleX < 0,
       px = "px",
       deg = "deg",
+      cs = getComputedStyle(target),
       origin = _getComputedProperty(target, _transformOriginProp) || "0",
       x,
       y,
@@ -6601,10 +7256,27 @@ _identity2DMatrix = [1, 0, 0, 1, 0, 0],
   x = y = z = rotation = rotationX = rotationY = skewX = skewY = perspective = 0;
   scaleX = scaleY = 1;
   cache.svg = !!(target.getCTM && _isSVG(target));
+
+  if (cs.translate) {
+    // accommodate independent transforms by combining them into normal ones.
+    if (cs.translate !== "none" || cs.scale !== "none" || cs.rotate !== "none") {
+      style[_transformProp] = (cs.translate !== "none" ? "translate3d(" + (cs.translate + " 0 0").split(" ").slice(0, 3).join(", ") + ") " : "") + (cs.rotate !== "none" ? "rotate(" + cs.rotate + ") " : "") + (cs.scale !== "none" ? "scale(" + cs.scale.split(" ").join(",") + ") " : "") + cs[_transformProp];
+    }
+
+    style.scale = style.rotate = style.translate = "none";
+  }
+
   matrix = _getMatrix(target, cache.svg);
 
   if (cache.svg) {
-    t1 = !cache.uncache && target.getAttribute("data-svg-origin");
+    if (cache.uncache) {
+      // if cache.uncache is true (and maybe if origin is 0,0), we need to set element.style.transformOrigin = (cache.xOrigin - bbox.x) + "px " + (cache.yOrigin - bbox.y) + "px". Previously we let the data-svg-origin stay instead, but when introducing revert(), it complicated things.
+      t2 = target.getBBox();
+      origin = cache.xOrigin - t2.x + "px " + (cache.yOrigin - t2.y) + "px";
+      t1 = "";
+    } else {
+      t1 = !uncache && target.getAttribute("data-svg-origin"); //  Remember, to work around browser inconsistencies we always force SVG elements' transformOrigin to 0,0 and offset the translation accordingly.
+    }
 
     _applySVGOrigin(target, t1 || origin, !!t1 || cache.originIsAbsolute, cache.smooth !== false, matrix);
   }
@@ -6630,7 +7302,7 @@ _identity2DMatrix = [1, 0, 0, 1, 0, 0],
       rotation = a || b ? _atan2(b, a) * _RAD2DEG : 0; //note: if scaleX is 0, we cannot accurately measure rotation. Same for skewX with a scaleY of 0. Therefore, we default to the previously recorded value (or zero if that doesn't exist).
 
       skewX = c || d ? _atan2(c, d) * _RAD2DEG + rotation : 0;
-      skewX && (scaleY *= Math.cos(skewX * _DEG2RAD));
+      skewX && (scaleY *= Math.abs(Math.cos(skewX * _DEG2RAD)));
 
       if (cache.svg) {
         x -= xOrigin - (xOrigin * a + yOrigin * c);
@@ -6728,8 +7400,9 @@ _identity2DMatrix = [1, 0, 0, 1, 0, 0],
     }
   }
 
-  cache.x = x - ((cache.xPercent = x && (cache.xPercent || (Math.round(target.offsetWidth / 2) === Math.round(-x) ? -50 : 0))) ? target.offsetWidth * cache.xPercent / 100 : 0) + px;
-  cache.y = y - ((cache.yPercent = y && (cache.yPercent || (Math.round(target.offsetHeight / 2) === Math.round(-y) ? -50 : 0))) ? target.offsetHeight * cache.yPercent / 100 : 0) + px;
+  uncache = uncache || cache.uncache;
+  cache.x = x - ((cache.xPercent = x && (!uncache && cache.xPercent || (Math.round(target.offsetWidth / 2) === Math.round(-x) ? -50 : 0))) ? target.offsetWidth * cache.xPercent / 100 : 0) + px;
+  cache.y = y - ((cache.yPercent = y && (!uncache && cache.yPercent || (Math.round(target.offsetHeight / 2) === Math.round(-y) ? -50 : 0))) ? target.offsetHeight * cache.yPercent / 100 : 0) + px;
   cache.z = z + px;
   cache.scaleX = (0, _gsapCore._round)(scaleX);
   cache.scaleY = (0, _gsapCore._round)(scaleY);
@@ -6925,13 +7598,13 @@ _addPxTranslate = function _addPxTranslate(target, start, value) {
 
   temp = "matrix(" + a11 + "," + a21 + "," + a12 + "," + a22 + "," + tx + "," + ty + ")";
   target.setAttribute("transform", temp);
-  forceCSS && (target.style[_transformProp] = temp); //some browsers prioritize CSS transforms over the transform attribute. When we sense that the user has CSS transforms applied, we must overwrite them this way (otherwise some browser simply won't render the  transform attribute changes!)
+  forceCSS && (target.style[_transformProp] = temp); //some browsers prioritize CSS transforms over the transform attribute. When we sense that the user has CSS transforms applied, we must overwrite them this way (otherwise some browser simply won't render the transform attribute changes!)
 },
-    _addRotationalPropTween = function _addRotationalPropTween(plugin, target, property, startNum, endValue, relative) {
+    _addRotationalPropTween = function _addRotationalPropTween(plugin, target, property, startNum, endValue) {
   var cap = 360,
       isString = (0, _gsapCore._isString)(endValue),
       endNum = parseFloat(endValue) * (isString && ~endValue.indexOf("rad") ? _RAD2DEG : 1),
-      change = relative ? endNum * relative : endNum - startNum,
+      change = endNum - startNum,
       finalValue = startNum + change + "deg",
       direction,
       pt;
@@ -6962,11 +7635,19 @@ _addPxTranslate = function _addPxTranslate(target, start, value) {
 
   return pt;
 },
+    _assign = function _assign(target, source) {
+  // Internet Explorer doesn't have Object.assign(), so we recreate it here.
+  for (var p in source) {
+    target[p] = source[p];
+  }
+
+  return target;
+},
     _addRawTransformPTs = function _addRawTransformPTs(plugin, transforms, target) {
   //for handling cases where someone passes in a whole transform string, like transform: "scale(2, 3) rotate(20deg) translateY(30em)"
-  var style = _tempDivStyler.style,
-      startCache = target._gsap,
+  var startCache = _assign({}, target._gsap),
       exclude = "perspective,force3D,transformOrigin,svgOrigin",
+      style = target.style,
       endCache,
       p,
       startValue,
@@ -6975,13 +7656,22 @@ _addPxTranslate = function _addPxTranslate(target, start, value) {
       endNum,
       startUnit,
       endUnit;
-  style.cssText = getComputedStyle(target).cssText + ";position:absolute;display:block;"; //%-based translations will fail unless we set the width/height to match the original target (and padding/borders can affect it)
 
-  style[_transformProp] = transforms;
+  if (startCache.svg) {
+    startValue = target.getAttribute("transform");
+    target.setAttribute("transform", "");
+    style[_transformProp] = transforms;
+    endCache = _parseTransform(target, 1);
 
-  _doc.body.appendChild(_tempDivStyler);
+    _removeProperty(target, _transformProp);
 
-  endCache = _parseTransform(_tempDivStyler, 1);
+    target.setAttribute("transform", startValue);
+  } else {
+    startValue = getComputedStyle(target)[_transformProp];
+    style[_transformProp] = transforms;
+    endCache = _parseTransform(target, 1);
+    style[_transformProp] = startValue;
+  }
 
   for (p in _transformProps) {
     startValue = startCache[p];
@@ -6993,14 +7683,14 @@ _addPxTranslate = function _addPxTranslate(target, start, value) {
       endUnit = (0, _gsapCore.getUnit)(endValue);
       startNum = startUnit !== endUnit ? _convertToUnit(target, p, startValue, endUnit) : parseFloat(startValue);
       endNum = parseFloat(endValue);
-      plugin._pt = new _gsapCore.PropTween(plugin._pt, startCache, p, startNum, endNum - startNum, _renderCSSProp);
+      plugin._pt = new _gsapCore.PropTween(plugin._pt, endCache, p, startNum, endNum - startNum, _renderCSSProp);
       plugin._pt.u = endUnit || 0;
 
       plugin._props.push(p);
     }
   }
 
-  _doc.body.removeChild(_tempDivStyler);
+  _assign(endCache, startCache);
 }; // handle splitting apart padding, margin, borderWidth, and borderRadius into their 4 components. Firefox, for example, won't report borderRadius correctly - it will only do borderTopLeftRadius and the other corners. We also want to handle paddingTop, marginLeft, borderRightWidth, etc.
 
 
@@ -7060,8 +7750,13 @@ var CSSPlugin = {
         transformPropTween,
         cache,
         smooth,
-        hasPriority;
-    _pluginInitted || _initCore();
+        hasPriority,
+        inlineProps;
+    _pluginInitted || _initCore(); // we may call init() multiple times on the same plugin instance, like when adding special properties, so make sure we don't overwrite the revert data or inlineProps
+
+    this.styles = this.styles || _getStyleSaver(target);
+    inlineProps = this.styles.props;
+    this.tween = tween;
 
     for (p in vars) {
       if (p === "autoRound") {
@@ -7093,15 +7788,24 @@ var CSSPlugin = {
         //CSS variable
         startValue = (getComputedStyle(target).getPropertyValue(p) + "").trim();
         endValue += "";
-        startUnit = (0, _gsapCore.getUnit)(startValue);
-        endUnit = (0, _gsapCore.getUnit)(endValue);
+        _gsapCore._colorExp.lastIndex = 0;
+
+        if (!_gsapCore._colorExp.test(startValue)) {
+          // colors don't have units
+          startUnit = (0, _gsapCore.getUnit)(startValue);
+          endUnit = (0, _gsapCore.getUnit)(endValue);
+        }
+
         endUnit ? startUnit !== endUnit && (startValue = _convertToUnit(target, p, startValue, endUnit) + endUnit) : startUnit && (endValue += startUnit);
         this.add(style, "setProperty", startValue, endValue, index, targets, 0, 0, p);
+        props.push(p);
+        inlineProps.push(p, style[p]);
       } else if (type !== "undefined") {
         if (startAt && p in startAt) {
           // in case someone hard-codes a complex value as the start, like top: "calc(2vh / 2)". Without this, it'd use the computed value (always in px)
           startValue = typeof startAt[p] === "function" ? startAt[p].call(tween, index, target, targets) : startAt[p];
-          p in _gsapCore._config.units && !(0, _gsapCore.getUnit)(startValue) && (startValue += _gsapCore._config.units[p]); // for cases when someone passes in a unitless value like {x: 100}; if we try setting translate(100, 0px) it won't work.
+          (0, _gsapCore._isString)(startValue) && ~startValue.indexOf("random(") && (startValue = (0, _gsapCore._replaceRandom)(startValue));
+          (0, _gsapCore.getUnit)(startValue + "") || (startValue += _gsapCore._config.units[p] || (0, _gsapCore.getUnit)(_get(target, p)) || ""); // for cases when someone passes in a unitless value like {x: 100}; if we try setting translate(100, 0px) it won't work.
 
           (startValue + "").charAt(1) === "=" && (startValue = _get(target, p)); // can't work with relative values
         } else {
@@ -7109,7 +7813,7 @@ var CSSPlugin = {
         }
 
         startNum = parseFloat(startValue);
-        relative = type === "string" && endValue.charAt(1) === "=" ? +(endValue.charAt(0) + "1") : 0;
+        relative = type === "string" && endValue.charAt(1) === "=" && endValue.substr(0, 2);
         relative && (endValue = endValue.substr(2));
         endNum = parseFloat(endValue);
 
@@ -7120,6 +7824,8 @@ var CSSPlugin = {
               //if visibility is initially set to "hidden", we should interpret that as intent to make opacity 0 (a convenience)
               startNum = 0;
             }
+
+            inlineProps.push("visibility", style.visibility);
 
             _addNonTweeningPT(this, style, "visibility", startNum ? "inherit" : "hidden", endNum ? "inherit" : "hidden", !endNum);
           }
@@ -7133,6 +7839,8 @@ var CSSPlugin = {
         isTransformRelated = p in _transformProps; //--- TRANSFORM-RELATED ---
 
         if (isTransformRelated) {
+          this.styles.save(p);
+
           if (!transformPropTween) {
             cache = target._gsap;
             cache.renderTransform && !vars.parseTransform || _parseTransform(target, vars.parseTransform); // if, for example, gsap.set(... {transform:"translateX(50vw)"}), the _get() call doesn't parse the transform, thus cache.renderTransform won't be set yet so force the parsing of the transform here.
@@ -7144,10 +7852,12 @@ var CSSPlugin = {
           }
 
           if (p === "scale") {
-            this._pt = new _gsapCore.PropTween(this._pt, cache, "scaleY", cache.scaleY, relative ? relative * endNum : endNum - cache.scaleY);
+            this._pt = new _gsapCore.PropTween(this._pt, cache, "scaleY", cache.scaleY, (relative ? (0, _gsapCore._parseRelative)(cache.scaleY, relative + endNum) : endNum) - cache.scaleY || 0, _renderCSSProp);
+            this._pt.u = 0;
             props.push("scaleY", p);
             p += "X";
           } else if (p === "transformOrigin") {
+            inlineProps.push(_transformOriginProp, style[_transformOriginProp]);
             endValue = _convertKeywordsToPercentages(endValue); //in case something like "left top" or "bottom right" is passed in. Convert to percentages.
 
             if (cache.svg) {
@@ -7166,7 +7876,7 @@ var CSSPlugin = {
 
             continue;
           } else if (p in _rotationalProperties) {
-            _addRotationalPropTween(this, cache, p, startNum, endValue, relative);
+            _addRotationalPropTween(this, cache, p, startNum, relative ? (0, _gsapCore._parseRelative)(startNum, relative + endValue) : endValue);
 
             continue;
           } else if (p === "smoothOrigin") {
@@ -7191,10 +7901,10 @@ var CSSPlugin = {
 
           endUnit = (0, _gsapCore.getUnit)(endValue) || (p in _gsapCore._config.units ? _gsapCore._config.units[p] : startUnit);
           startUnit !== endUnit && (startNum = _convertToUnit(target, p, startValue, endUnit));
-          this._pt = new _gsapCore.PropTween(this._pt, isTransformRelated ? cache : style, p, startNum, relative ? relative * endNum : endNum - startNum, !isTransformRelated && (endUnit === "px" || p === "zIndex") && vars.autoRound !== false ? _renderRoundedCSSProp : _renderCSSProp);
+          this._pt = new _gsapCore.PropTween(this._pt, isTransformRelated ? cache : style, p, startNum, (relative ? (0, _gsapCore._parseRelative)(startNum, relative + endNum) : endNum) - startNum, !isTransformRelated && (endUnit === "px" || p === "zIndex") && vars.autoRound !== false ? _renderRoundedCSSProp : _renderCSSProp);
           this._pt.u = endUnit || 0;
 
-          if (startUnit !== endUnit) {
+          if (startUnit !== endUnit && endUnit !== "%") {
             //when the tween goes all the way back to the beginning, we need to revert it to the OLD/ORIGINAL value (with those units). We record that as a "b" (beginning) property and point to a render method that handles that. (performance optimization)
             this._pt.b = startValue;
             this._pt.r = _renderCSSPropWithBeginning;
@@ -7202,20 +7912,33 @@ var CSSPlugin = {
         } else if (!(p in style)) {
           if (p in target) {
             //maybe it's not a style - it could be a property added directly to an element in which case we'll try to animate that.
-            this.add(target, p, target[p], endValue, index, targets);
+            this.add(target, p, startValue || target[p], relative ? relative + endValue : endValue, index, targets);
           } else {
             (0, _gsapCore._missingPlugin)(p, endValue);
             continue;
           }
         } else {
-          _tweenComplexCSSString.call(this, target, p, startValue, endValue);
+          _tweenComplexCSSString.call(this, target, p, startValue, relative ? relative + endValue : endValue);
         }
 
+        isTransformRelated || inlineProps.push(p, style[p]);
         props.push(p);
       }
     }
 
     hasPriority && (0, _gsapCore._sortPropTweensByPriority)(this);
+  },
+  render: function render(ratio, data) {
+    if (data.tween._time || !_reverting()) {
+      var pt = data._pt;
+
+      while (pt) {
+        pt.r(ratio, pt.d);
+        pt = pt._next;
+      }
+    } else {
+      data.styles.revert();
+    }
   },
   get: _get,
   aliases: _propertyAliases,
@@ -7232,6 +7955,7 @@ var CSSPlugin = {
 };
 exports.default = exports.CSSPlugin = CSSPlugin;
 _gsapCore.gsap.utils.checkPrefix = _checkPropPrefix;
+_gsapCore.gsap.core.getStyleSaver = _getStyleSaver;
 
 (function (positionAndScale, rotation, others, aliases) {
   var all = (0, _gsapCore._forEachName)(positionAndScale + "," + rotation + "," + others, function (name) {
@@ -7258,6 +7982,54 @@ _gsapCore.gsap.registerPlugin(CSSPlugin);
 
 Object.defineProperty(exports, "__esModule", {
   value: true
+});
+Object.defineProperty(exports, "Back", {
+  enumerable: true,
+  get: function () {
+    return _gsapCore.Back;
+  }
+});
+Object.defineProperty(exports, "Bounce", {
+  enumerable: true,
+  get: function () {
+    return _gsapCore.Bounce;
+  }
+});
+Object.defineProperty(exports, "CSSPlugin", {
+  enumerable: true,
+  get: function () {
+    return _CSSPlugin.CSSPlugin;
+  }
+});
+Object.defineProperty(exports, "Circ", {
+  enumerable: true,
+  get: function () {
+    return _gsapCore.Circ;
+  }
+});
+Object.defineProperty(exports, "Cubic", {
+  enumerable: true,
+  get: function () {
+    return _gsapCore.Cubic;
+  }
+});
+Object.defineProperty(exports, "Elastic", {
+  enumerable: true,
+  get: function () {
+    return _gsapCore.Elastic;
+  }
+});
+Object.defineProperty(exports, "Expo", {
+  enumerable: true,
+  get: function () {
+    return _gsapCore.Expo;
+  }
+});
+Object.defineProperty(exports, "Linear", {
+  enumerable: true,
+  get: function () {
+    return _gsapCore.Linear;
+  }
 });
 Object.defineProperty(exports, "Power0", {
   enumerable: true,
@@ -7289,22 +8061,10 @@ Object.defineProperty(exports, "Power4", {
     return _gsapCore.Power4;
   }
 });
-Object.defineProperty(exports, "Linear", {
-  enumerable: true,
-  get: function () {
-    return _gsapCore.Linear;
-  }
-});
 Object.defineProperty(exports, "Quad", {
   enumerable: true,
   get: function () {
     return _gsapCore.Quad;
-  }
-});
-Object.defineProperty(exports, "Cubic", {
-  enumerable: true,
-  get: function () {
-    return _gsapCore.Cubic;
   }
 });
 Object.defineProperty(exports, "Quart", {
@@ -7319,22 +8079,10 @@ Object.defineProperty(exports, "Quint", {
     return _gsapCore.Quint;
   }
 });
-Object.defineProperty(exports, "Strong", {
+Object.defineProperty(exports, "Sine", {
   enumerable: true,
   get: function () {
-    return _gsapCore.Strong;
-  }
-});
-Object.defineProperty(exports, "Elastic", {
-  enumerable: true,
-  get: function () {
-    return _gsapCore.Elastic;
-  }
-});
-Object.defineProperty(exports, "Back", {
-  enumerable: true,
-  get: function () {
-    return _gsapCore.Back;
+    return _gsapCore.Sine;
   }
 });
 Object.defineProperty(exports, "SteppedEase", {
@@ -7343,34 +8091,10 @@ Object.defineProperty(exports, "SteppedEase", {
     return _gsapCore.SteppedEase;
   }
 });
-Object.defineProperty(exports, "Bounce", {
+Object.defineProperty(exports, "Strong", {
   enumerable: true,
   get: function () {
-    return _gsapCore.Bounce;
-  }
-});
-Object.defineProperty(exports, "Sine", {
-  enumerable: true,
-  get: function () {
-    return _gsapCore.Sine;
-  }
-});
-Object.defineProperty(exports, "Expo", {
-  enumerable: true,
-  get: function () {
-    return _gsapCore.Expo;
-  }
-});
-Object.defineProperty(exports, "Circ", {
-  enumerable: true,
-  get: function () {
-    return _gsapCore.Circ;
-  }
-});
-Object.defineProperty(exports, "TweenLite", {
-  enumerable: true,
-  get: function () {
-    return _gsapCore.TweenLite;
+    return _gsapCore.Strong;
   }
 });
 Object.defineProperty(exports, "TimelineLite", {
@@ -7385,13 +8109,13 @@ Object.defineProperty(exports, "TimelineMax", {
     return _gsapCore.TimelineMax;
   }
 });
-Object.defineProperty(exports, "CSSPlugin", {
+Object.defineProperty(exports, "TweenLite", {
   enumerable: true,
   get: function () {
-    return _CSSPlugin.CSSPlugin;
+    return _gsapCore.TweenLite;
   }
 });
-exports.TweenMax = exports.default = exports.gsap = void 0;
+exports.gsap = exports.default = exports.TweenMax = void 0;
 
 var _gsapCore = require("./gsap-core.js");
 
@@ -7480,9 +8204,9 @@ var _litHtml = require("lit-html");
 
 var _Toast = _interopRequireDefault(require("./Toast"));
 
-function _getRequireWildcardCache() { if (typeof WeakMap !== "function") return null; var cache = new WeakMap(); _getRequireWildcardCache = function () { return cache; }; return cache; }
+function _getRequireWildcardCache(nodeInterop) { if (typeof WeakMap !== "function") return null; var cacheBabelInterop = new WeakMap(); var cacheNodeInterop = new WeakMap(); return (_getRequireWildcardCache = function (nodeInterop) { return nodeInterop ? cacheNodeInterop : cacheBabelInterop; })(nodeInterop); }
 
-function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } if (obj === null || typeof obj !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
+function _interopRequireWildcard(obj, nodeInterop) { if (!nodeInterop && obj && obj.__esModule) { return obj; } if (obj === null || typeof obj !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(nodeInterop); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (key !== "default" && Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -7659,7 +8383,7 @@ class Utils {
 var _default = new Utils();
 
 exports.default = _default;
-},{"gsap":"../node_modules/gsap/index.js"}],"BookAPI.js":[function(require,module,exports) {
+},{"gsap":"../node_modules/gsap/index.js"}],"ArtworkAPI.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -7675,10 +8399,10 @@ var _Toast = _interopRequireDefault(require("./Toast"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-class BookAPI {
-  async newBook(formData) {
+class ArtworkAPI {
+  async newArtwork(formData) {
     // send fetch request
-    const response = await fetch("".concat(_App.default.apiBase, "/book"), {
+    const response = await fetch("".concat(_App.default.apiBase, "/artwork"), {
       method: 'POST',
       headers: {
         "Authorization": "Bearer ".concat(localStorage.accessToken)
@@ -7687,7 +8411,7 @@ class BookAPI {
     }); // if response not ok
 
     if (!response.ok) {
-      let message = 'Problem adding book';
+      let message = 'Problem adding artwork';
 
       if (response.status == 400) {
         const err = await response.json();
@@ -7704,9 +8428,9 @@ class BookAPI {
     return data;
   }
 
-  async getBooks() {
+  async getArtworks() {
     // fetch the json data
-    const response = await fetch("".concat(_App.default.apiBase, "/book"), {
+    const response = await fetch("".concat(_App.default.apiBase, "/artwork"), {
       headers: {
         "Authorization": "Bearer ".concat(localStorage.accessToken)
       }
@@ -7717,7 +8441,7 @@ class BookAPI {
       const err = await response.json();
       if (err) console.log(err); // throw error (exit this function)      
 
-      throw new Error('Problem getting books');
+      throw new Error('Problem getting artworks');
     } // convert response payload into json - store as data
 
 
@@ -7728,10 +8452,10 @@ class BookAPI {
 
 }
 
-var _default = new BookAPI();
+var _default = new ArtworkAPI();
 
 exports.default = _default;
-},{"./App":"App.js","./Auth":"Auth.js","./Toast":"Toast.js"}],"views/pages/books.js":[function(require,module,exports) {
+},{"./App":"App.js","./Auth":"Auth.js","./Toast":"Toast.js"}],"views/pages/artworks.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -7749,75 +8473,37 @@ var _Auth = _interopRequireDefault(require("../../Auth"));
 
 var _Utils = _interopRequireDefault(require("../../Utils"));
 
-var _BookAPI = _interopRequireDefault(require("./../../BookAPI"));
+var _ArtworkAPI = _interopRequireDefault(require("../../ArtworkAPI"));
 
-var _Toast = _interopRequireDefault(require("./../../Toast"));
+var _Toast = _interopRequireDefault(require("../../Toast"));
+
+var _templateObject, _templateObject2, _templateObject3, _templateObject4;
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-function _templateObject4() {
-  const data = _taggedTemplateLiteral([" \n\n          <va-book class=\"book-card\"\n          id=\"", "\"\n          name=\"", "\"\n          author=\"", "\" \n          genre=\"", "\" \n          description=\"", "\" \n          summary=\"", "\" \n          image=\"", "\">\n         \n          </va-book>\n        "]);
-
-  _templateObject4 = function _templateObject4() {
-    return data;
-  };
-
-  return data;
-}
-
-function _templateObject3() {
-  const data = _taggedTemplateLiteral(["\n          ", "\n        "]);
-
-  _templateObject3 = function _templateObject3() {
-    return data;
-  };
-
-  return data;
-}
-
-function _templateObject2() {
-  const data = _taggedTemplateLiteral(["\n            <sl-spinner></sl-spinner>\n        \n        "]);
-
-  _templateObject2 = function _templateObject2() {
-    return data;
-  };
-
-  return data;
-}
-
-function _templateObject() {
-  const data = _taggedTemplateLiteral(["\n    <style>\n    .filter-menu{\n        display: flex;\n        align-items: center;\n    }\n\n    .filter-menu > div {\n      margin-right: 1em;\n    }\n    </style>\n\n\n      <va-app-header title=\"Books\" user=\"", "\"></va-app-header>\n      <div class=\"page-content\">        \n        <h1> Book Store </h1>\n\n        <div class=\"filter-menu\">\n          <div> Filter by </div>\n          <div>\n           <strong> Genre </strong>\n           <sl-button id=\"g\" class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"guide\" @click=", ">Guide</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"action\" @click=", ">Action</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"crime\" @click=", ">Crime</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"fantasy\" @click=", ">Fantasy</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"horror\" @click=", ">Horror</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"memoir\" @click=", ">Memoir</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"romance\" @click=", ">Romance</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"poetry\" @click=", ">Poetry</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"phylosophy\" @click=", ">Phylosophy</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"biography\" @click=", ">Biography</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"drama\" @click=", ">Drama</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"thriller\" @click=", ">Thriller</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"selfHelp\" @click=", ">Self Help</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"suspense\" @click=", ">Suspense</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"mystery\" @click=", ">Mystery</sl-button>\n           </div>\n           \n           <div>\n            <sl-button size=\"small\" @click=", ">Clear Filter</sl-button>\n           </div>\n        </div>\n\n\n          \n        <div class=\"books-grid\">\n        ", "\n    </div>\n        \n      </div>      \n    "]);
-
-  _templateObject = function _templateObject() {
-    return data;
-  };
-
-  return data;
-}
-
 function _taggedTemplateLiteral(strings, raw) { if (!raw) { raw = strings.slice(0); } return Object.freeze(Object.defineProperties(strings, { raw: { value: Object.freeze(raw) } })); }
 
-class BooksView {
+class ArtworksView {
   async init() {
-    document.title = 'Books';
-    this.books = null;
+    document.title = 'Artworks';
+    this.artworks = null;
     this.render();
 
     _Utils.default.pageIntroAnim();
 
-    await this.getBooks(); //this.filterBooks('genre',' ')
+    await this.getArtworks(); //this.filterArtworks('genre',' ')
   }
 
-  async filterBooks(field, match) {
+  async filterArtworks(field, match) {
     //validate 
-    if (!field || !match) return; // get fresh copy of the books 
+    if (!field || !match) return; // get fresh copy of the artworks 
 
-    this.books = await _BookAPI.default.getBooks();
-    let filteredBooks;
+    this.artworks = await _ArtworkAPI.default.getArtworks();
+    let filteredArtworks;
 
     if (field == 'genre') {
-      filteredBooks = this.books.filter(book => book.genre == match);
-      this.books = filteredBooks;
+      filteredArtworks = this.artworks.filter(artwork => artwork.genre == match);
+      this.artworks = filteredArtworks;
       this.render();
     }
   }
@@ -7834,20 +8520,20 @@ class BooksView {
     e.target.setAttribute("type", "primary"); // extraxt the field & match from the button
 
     const field = e.target.getAttribute("data-field");
-    const match = e.target.getAttribute("data-match"); //filter books
+    const match = e.target.getAttribute("data-match"); //filter artworks
 
-    this.filterBooks(field, match);
+    this.filterArtworks(field, match);
   }
 
   clearFilter() {
-    this.getBooks();
+    this.getArtworks();
     this.clearFilterBtns();
   }
 
-  async getBooks() {
+  async getArtworks() {
     try {
-      this.books = await _BookAPI.default.getBooks();
-      console.log(this.books);
+      this.artworks = await _ArtworkAPI.default.getArtworks();
+      console.log(this.artworks);
       this.render();
     } catch (err) {
       _Toast.default.show(err, 'error');
@@ -7855,16 +8541,16 @@ class BooksView {
   }
 
   render() {
-    const template = (0, _litHtml.html)(_templateObject(), JSON.stringify(_Auth.default.currentUser), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.clearFilter.bind(this), this.books == null ? (0, _litHtml.html)(_templateObject2()) : (0, _litHtml.html)(_templateObject3(), this.books.map(book => (0, _litHtml.html)(_templateObject4(), book._id, book.name, book.author, book.genre, book.description, book.summary, book.image))));
+    const template = (0, _litHtml.html)(_templateObject || (_templateObject = _taggedTemplateLiteral(["\n    <style>\n    .filter-menu{\n        display: flex;\n        align-items: center;\n    }\n\n    .filter-menu > div {\n      margin-right: 1em;\n    }\n    </style>\n\n\n      <va-app-header title=\"Artworks\" user=\"", "\"></va-app-header>\n      <div class=\"page-content\">        \n        <h1> Artwork Store </h1>\n\n        <div class=\"filter-menu\">\n          <div> Filter by </div>\n          <div>\n           <strong> Genre </strong>\n          \n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"action\" @click=", ">Action</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"shading\" @click=", ">Shading</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"portrait\" @click=", ">Portrait</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"horror\" @click=", ">Horror</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"oilPainting\" @click=", ">Oil Painting</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"romance\" @click=", ">Romance</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"poetry\" @click=", ">Poetry</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"colouredPencil\" @click=", ">Coloured Pencil</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"detailed\" @click=", ">Detailed</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"drama\" @click=", ">Drama</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"thriller\" @click=", ">Thriller</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"selfHelp\" @click=", ">Self Help</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"small\" @click=", ">Small</sl-button>\n           <sl-button class=\"filter-btn\" size =\"small\" data-field=\"genre\" data-match=\"mystery\" @click=", ">Mystery</sl-button>\n           </div>\n           \n           <div>\n            <sl-button size=\"small\" @click=", ">Clear Filter</sl-button>\n           </div>\n        </div>\n\n\n          \n        <div class=\"artworks-grid\">\n        ", "\n    </div>\n        \n      </div>      \n    "])), JSON.stringify(_Auth.default.currentUser), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.handleFilterBtn.bind(this), this.clearFilter.bind(this), this.artworks == null ? (0, _litHtml.html)(_templateObject2 || (_templateObject2 = _taggedTemplateLiteral(["\n            <sl-spinner></sl-spinner>\n        \n        "]))) : (0, _litHtml.html)(_templateObject3 || (_templateObject3 = _taggedTemplateLiteral(["\n          ", "\n        "])), this.artworks.map(artwork => (0, _litHtml.html)(_templateObject4 || (_templateObject4 = _taggedTemplateLiteral([" \n\n          <va-artwork class=\"artwork-card\"\n          id=\"", "\"\n          name=\"", "\"\n          author=\"", "\" \n          genre=\"", "\" \n          price=\"", "\" \n          summary=\"", "\" \n          image=\"", "\">\n         \n          </va-artwork>\n        "])), artwork._id, artwork.name, artwork.author, artwork.genre, artwork.price, artwork.summary, artwork.image))));
     (0, _litHtml.render)(template, _App.default.rootEl);
   }
 
 }
 
-var _default = new BooksView();
+var _default = new ArtworksView();
 
 exports.default = _default;
-},{"../../App":"App.js","lit-html":"../node_modules/lit-html/lit-html.js","../../Router":"Router.js","../../Auth":"Auth.js","../../Utils":"Utils.js","./../../BookAPI":"BookAPI.js","./../../Toast":"Toast.js"}],"views/pages/home.js":[function(require,module,exports) {
+},{"../../App":"App.js","lit-html":"../node_modules/lit-html/lit-html.js","../../Router":"Router.js","../../Auth":"Auth.js","../../Utils":"Utils.js","../../ArtworkAPI":"ArtworkAPI.js","../../Toast":"Toast.js"}],"views/pages/home.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -7882,53 +8568,15 @@ var _Auth = _interopRequireDefault(require("./../../Auth"));
 
 var _Utils = _interopRequireDefault(require("./../../Utils"));
 
-var _books = _interopRequireDefault(require("./books"));
+var _artworks = _interopRequireDefault(require("./artworks"));
 
-var _BookAPI = _interopRequireDefault(require("./../../BookAPI"));
+var _ArtworkAPI = _interopRequireDefault(require("./../../ArtworkAPI"));
 
 var _Toast = _interopRequireDefault(require("./../../Toast"));
 
+var _templateObject, _templateObject2, _templateObject3, _templateObject4;
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _templateObject4() {
-  const data = _taggedTemplateLiteral([" \n\n              <va-book class=\"book-card\"\n              id=\"", "\"\n              name=\"", "\"\n              author=\"", "\" \n              genre=\"", "\" \n              description=\"", "\" \n              summary=\"", "\" \n              image=\"", "\">\n             \n              </va-book>\n            "]);
-
-  _templateObject4 = function _templateObject4() {
-    return data;
-  };
-
-  return data;
-}
-
-function _templateObject3() {
-  const data = _taggedTemplateLiteral(["\n              ", "\n            "]);
-
-  _templateObject3 = function _templateObject3() {
-    return data;
-  };
-
-  return data;
-}
-
-function _templateObject2() {
-  const data = _taggedTemplateLiteral(["\n                <sl-spinner></sl-spinner>\n            \n            "]);
-
-  _templateObject2 = function _templateObject2() {
-    return data;
-  };
-
-  return data;
-}
-
-function _templateObject() {
-  const data = _taggedTemplateLiteral(["\n      <va-app-header title=\"Home\" user=", "></va-app-header>\n      \n      <div class=\"page-content\">\n      \n        <div class=\"header calign \" >  \n        \n        <div class=\" woman-Character\"> \n         <svg width=\"239\" height=\"483\" viewBox=\"0 0 239 483\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n            <g id=\"womanHi\" clip-path=\"url(#clip0)\">\n            <g id=\"head\">\n            <path id=\"Fill 146\" d=\"M58.5035 27.6235C56.9798 24.0417 54.3055 21.07 50.9035 19.1785C49.2016 18.2606 47.3023 17.7698 45.3688 17.7482C43.4353 17.7266 41.5254 18.1749 39.8035 19.0545C38.108 19.9912 36.7514 21.4392 35.927 23.192C35.1027 24.9449 34.8526 26.9132 35.2125 28.8165C29.2575 31.7045 26.4895 39.8025 29.4275 45.7445C31.0042 48.6633 33.6341 50.8714 36.7817 51.9192C39.9293 52.9671 43.3579 52.7759 46.3695 51.3845C43.2055 55.5715 45.9065 62.4315 50.8695 64.1225C55.8325 65.8135 61.6025 62.8805 64.0755 58.2445C66.5485 53.6085 66.1005 47.8145 63.9095 43.0445\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 148\" d=\"M60.7285 30.2995C60.3675 29.4098 59.7814 28.6291 59.0278 28.0341C58.2741 27.4391 57.3787 27.0502 56.4295 26.9055C55.476 26.7944 54.5121 26.9927 53.6799 27.4711C52.8477 27.9495 52.1912 28.6827 51.8075 29.5625C51.4748 30.4622 51.4952 31.4544 51.8646 32.3396C52.234 33.2248 52.925 33.9373 53.7985 34.3335C52.7233 34.8473 51.8466 35.7 51.3032 36.7606C50.7597 37.8211 50.5796 39.0307 50.7905 40.2035C51.055 41.3649 51.6948 42.4069 52.6108 43.1682C53.5269 43.9296 54.6683 44.3679 55.8585 44.4155C55.3211 45.4045 55.1298 46.5447 55.315 47.6549C55.5002 48.7651 56.0512 49.7815 56.8805 50.5425C57.7473 51.2575 58.8292 51.6604 59.9526 51.6865C61.0759 51.7126 62.1754 51.3605 63.0745 50.6865C64.3791 49.5447 65.1814 47.9347 65.3075 46.2055C65.4242 44.4935 65.3159 42.7735 64.9855 41.0895C64.5955 38.5209 64.2051 35.9515 63.8145 33.3815C63.7202 32.242 63.3942 31.1337 62.8565 30.1245C62.5793 29.626 62.1593 29.2217 61.6505 28.9637C61.1418 28.7057 60.5675 28.6057 60.0015 28.6765\" fill=\"#DA2C2C\"/>\n            <path id=\"Fill 150\" d=\"M122.835 9.22855C124.675 5.92855 123.527 1.49855 120.797 -1.11245C118.067 -3.72345 114.114 -4.71945 110.344 -4.61245C106.578 -4.33526 102.865 -3.56191 99.3005 -2.31245C97.9257 -4.05919 96.1028 -5.40024 94.026 -6.19271C91.9493 -6.98517 89.6964 -7.19936 87.5075 -6.81245C85.3282 -6.36567 83.3107 -5.33682 81.6693 -3.83524C80.0279 -2.33366 78.824 -0.415454 78.1855 1.71555C76.8876 1.22043 75.481 1.0809 74.1112 1.31138C72.7413 1.54186 71.4579 2.13398 70.3935 3.02655C69.3506 3.94806 68.5714 5.13025 68.1358 6.452C67.7002 7.77375 67.6238 9.18755 67.9145 10.5485L83.8935 18.5995L98.0355 53.1945C100.492 55.7622 103.77 57.3891 107.301 57.7933C110.831 58.1975 114.392 57.3535 117.365 55.4075C120.224 53.2869 122.255 50.237 123.11 46.7818C123.965 43.3265 123.59 39.6814 122.049 36.4725C123.19 35.6902 124.195 34.7261 125.024 33.6185C126.598 32.9406 128.021 31.9566 129.212 30.7239C130.402 29.4911 131.335 28.0341 131.957 26.4375C134.457 19.5555 129.92 10.9995 122.833 9.22655\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 152\" d=\"M103.144 75.0185C102.777 69.6365 102.513 65.9495 102.519 65.9885C102.519 65.9885 112.88 63.4056 113.972 49.4976C114.513 42.5816 113.288 31.4075 111.991 22.2975C110.822 14.0975 104.581 4.41855 96.4615 5.93755L71.4045 14.4465C68.9375 14.9085 68.2365 17.0845 68.4835 19.5895L68.3695 20.7785L72.6695 60.0256L74.3595 77.5356C74.746 81.3109 76.6023 84.7826 79.5273 87.2006C82.4524 89.6186 86.2113 90.7887 89.992 90.4581C93.7726 90.1275 97.2714 88.3228 99.7325 85.4338C102.193 82.5449 103.419 78.8037 103.144 75.0185Z\" fill=\"#FFBF9D\"/>\n            <path id=\"Fill 154\" d=\"M107.976 33.8876C108.017 34.3458 107.878 34.8018 107.587 35.1588C107.297 35.5158 106.879 35.7457 106.422 35.7996C106.2 35.8347 105.973 35.8251 105.755 35.7711C105.536 35.7172 105.331 35.6201 105.151 35.4855C104.97 35.3509 104.819 35.1816 104.705 34.9876C104.591 34.7935 104.517 34.5786 104.487 34.3556C104.446 33.8975 104.585 33.4414 104.874 33.084C105.163 32.7266 105.581 32.4962 106.037 32.4416C106.26 32.4062 106.488 32.4158 106.706 32.4698C106.925 32.5237 107.131 32.621 107.312 32.7557C107.493 32.8905 107.644 33.0601 107.759 33.2544C107.873 33.4488 107.947 33.6641 107.976 33.8876Z\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 156\" d=\"M109.697 29.7146C109.497 29.9616 108.088 29.0796 106.197 29.2336C104.307 29.3616 102.997 30.4476 102.772 30.2336C102.665 30.1326 102.856 29.7006 103.425 29.2146C104.197 28.5789 105.148 28.199 106.145 28.1276C107.126 28.0473 108.107 28.2816 108.945 28.7966C109.562 29.1966 109.792 29.5966 109.692 29.7096\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 158\" d=\"M90.4025 34.5025C90.4434 34.9608 90.3039 35.417 90.0137 35.7741C89.7235 36.1311 89.3055 36.3609 88.8485 36.4145C88.6262 36.4497 88.3992 36.4401 88.1808 36.3861C87.9623 36.3322 87.7569 36.2351 87.5765 36.1005C87.3962 35.9659 87.2446 35.7966 87.1308 35.6026C87.0169 35.4085 86.943 35.1936 86.9135 34.9705C86.8717 34.5123 87.0105 34.0559 87.3001 33.6984C87.5898 33.341 88.0076 33.1107 88.4645 33.0565C88.6871 33.0211 88.9145 33.0306 89.1334 33.0845C89.3522 33.1384 89.5581 33.2356 89.7387 33.3704C89.9194 33.5052 90.0712 33.6749 90.1852 33.8693C90.2992 34.0637 90.3731 34.2791 90.4025 34.5025Z\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 160\" d=\"M91.6175 30.7855C91.4175 31.0325 90.0055 30.1505 88.1175 30.3055C86.2275 30.4325 84.9175 31.5185 84.6925 31.3055C84.5855 31.2035 84.7725 30.7715 85.3445 30.2855C86.1166 29.6501 87.0671 29.2703 88.0645 29.1985C89.0452 29.1189 90.0257 29.3532 90.8645 29.8675C91.4805 30.2675 91.7115 30.6675 91.6135 30.7805\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 162\" d=\"M99.4435 43.6586C100.415 43.2662 101.433 42.9975 102.471 42.8586C102.949 42.7696 103.398 42.6366 103.454 42.2996C103.455 41.7969 103.302 41.306 103.016 40.8926C102.47 39.7592 101.897 38.5686 101.297 37.3206C98.9035 32.2306 97.1275 28.0306 97.3325 27.9306C97.5375 27.8306 99.6465 31.8866 102.044 36.9786C102.623 38.2356 103.176 39.4316 103.705 40.5786C104.055 41.1388 104.196 41.8037 104.105 42.4576C104.049 42.6337 103.953 42.7946 103.825 42.9282C103.698 43.0618 103.541 43.1645 103.367 43.2286C103.106 43.3224 102.833 43.3825 102.556 43.4076C101.534 43.6238 100.488 43.7085 99.4445 43.6596\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 166\" d=\"M91.2275 25.6355C91.0355 26.1505 89.1455 25.8935 86.9185 26.1475C84.6885 26.3575 82.8895 26.9975 82.5965 26.5315C82.4665 26.3095 82.7815 25.8255 83.5095 25.3315C84.477 24.7138 85.5777 24.335 86.7205 24.2265C87.8596 24.0966 89.0133 24.2406 90.0855 24.6465C90.9005 24.9855 91.3095 25.3855 91.2275 25.6355Z\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 168\" d=\"M109.342 25.9946C108.982 26.4566 107.405 26.1326 105.552 26.2576C103.698 26.3286 102.154 26.8186 101.757 26.3966C101.581 26.1906 101.798 25.7396 102.448 25.2776C103.352 24.695 104.397 24.3669 105.471 24.3276C106.539 24.2512 107.607 24.4676 108.56 24.9536C109.249 25.3446 109.499 25.7716 109.343 25.9946\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 170\" d=\"M78.3425 6.30154C78.4516 7.6793 78.858 9.01704 79.5337 10.2227C80.2094 11.4283 81.1383 12.4733 82.2565 13.2855C83.3828 14.0818 84.6688 14.6235 86.0254 14.873C87.382 15.1226 88.7766 15.0739 90.1125 14.7305C92.1785 14.1855 94.3905 12.9475 96.2875 13.9305C98.2875 14.9595 98.5875 17.8305 100.387 19.1745C102.962 21.0905 106.652 18.8225 109.787 19.4975C112.209 20.0195 113.861 22.1755 115.58 23.9635C117.299 25.7515 119.796 27.3845 122.108 26.4965C121.875 24.3614 121.397 22.2602 120.682 20.2345C119.958 18.1963 118.551 16.471 116.7 15.3505C115.62 14.8926 114.564 14.3802 113.535 13.8155C111.448 12.3765 110.78 9.64254 109.397 7.51554C108.491 6.14954 107.272 5.01955 105.841 4.21948C104.411 3.41941 102.81 2.97238 101.171 2.91554C98.4565 2.84554 95.7415 3.87254 93.0625 3.41054C91.0845 3.06254 89.2905 1.92754 87.2905 1.70454C83.4085 1.26954 80.0585 4.30154 77.4905 7.26254\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 172\" d=\"M91.0245 10.8236C89.2685 10.4636 85.6705 9.62355 84.6335 8.19655C82.3845 5.10555 78.6865 3.16655 75.0975 3.63755C73.2401 3.92908 71.5271 4.81446 70.2151 6.1611C68.903 7.50775 68.0626 9.2432 67.8195 11.1076C65.5843 11.3627 63.4594 12.2163 61.669 13.5784C59.8785 14.9405 58.4888 16.7605 57.6465 18.8465C56.779 21.0349 56.4548 23.4009 56.7018 25.742C56.9487 28.0831 57.7594 30.3294 59.0645 32.2885C59.6902 33.3187 60.2432 34.3913 60.7195 35.4985C59.7467 36.4353 58.8654 37.4626 58.0875 38.5666C54.4535 44.4836 61.8265 47.8796 61.8265 47.8796C61.3065 52.1045 65.1875 52.5856 67.6795 52.8936C70.0795 53.1936 70.6965 60.0355 72.6655 60.0275L73.3325 39.2126C73.6086 39.3594 73.9092 39.4546 74.2195 39.4935C78.9015 40.1835 78.8195 31.1215 77.5925 28.6225C79.2211 27.0655 80.6473 25.3097 81.8375 23.3965C82.9645 21.4145 83.6895 16.1966 83.2375 13.9016C84.9045 13.8706 91.7925 10.9856 91.0215 10.8276\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 174\" d=\"M73.8935 40.3886C73.8194 39.7144 73.5754 39.07 73.1844 38.5159C72.7933 37.9618 72.2679 37.5161 71.6575 37.2204C71.0471 36.9248 70.3716 36.789 69.6944 36.8258C69.0171 36.8625 68.3603 37.0706 67.7855 37.4306C66.4595 38.3426 65.5225 40.0406 65.8855 43.1306C66.8625 51.3796 74.9195 48.7006 74.9075 48.4626C74.8995 48.3136 74.3275 43.7986 73.8955 40.3896\" fill=\"#FFBF9D\"/>\n            <path id=\"Fill 176\" d=\"M72.0245 45.6346C71.9865 45.6116 71.8925 45.7516 71.6645 45.8926C71.3412 46.0785 70.9585 46.1323 70.5965 46.0426C69.6885 45.8256 68.7965 44.5286 68.5785 43.0426C68.4751 42.3389 68.5287 41.6211 68.7355 40.9406C68.7821 40.674 68.8927 40.4227 69.0576 40.2082C69.2225 39.9936 69.4369 39.8222 69.6825 39.7086C69.8424 39.6458 70.0192 39.6409 70.1824 39.6946C70.3456 39.7482 70.485 39.8572 70.5765 40.0026C70.7125 40.2196 70.6765 40.3906 70.7255 40.4026C70.7495 40.4206 70.8845 40.2436 70.7785 39.9106C70.7096 39.7109 70.574 39.541 70.3945 39.4296C70.1479 39.2853 69.8545 39.2437 69.5775 39.3136C69.2473 39.4211 68.9502 39.6115 68.7145 39.8666C68.4789 40.1216 68.3126 40.4329 68.2315 40.7706C67.9651 41.5268 67.8879 42.3366 68.0065 43.1296C68.2535 44.7826 69.2875 46.2396 70.5185 46.4436C70.7469 46.4814 70.981 46.4673 71.2032 46.4024C71.4255 46.3375 71.6303 46.2234 71.8025 46.0686C72.0335 45.8346 72.0535 45.6446 72.0245 45.6336\" fill=\"#FF9A6C\"/>\n            <path id=\"Fill 178\" d=\"M118.074 34.7335C118.033 34.6665 118.866 34.2685 120.043 33.1525C121.685 31.5492 122.826 29.5032 123.326 27.2635C123.693 25.7361 123.743 24.15 123.473 22.6025C123.161 20.8365 122.379 19.1871 121.209 17.8275C119.845 16.2938 118.101 15.1457 116.153 14.4984C114.205 13.8511 112.121 13.7273 110.109 14.1395C109.72 14.2105 109.352 14.3535 108.98 14.4545C108.619 14.5885 108.275 14.7465 107.935 14.8835L107.409 15.0975L107.472 14.5485C107.583 13.5857 107.347 12.6151 106.806 11.8105C106.265 11.0209 105.556 10.3611 104.729 9.87855C103.137 8.9603 101.29 8.58311 99.4645 8.80355C95.9475 9.14155 92.8475 10.3335 90.0695 10.2955C87.8804 10.3881 85.7356 9.66063 84.0545 8.25555C83.6278 7.85324 83.2734 7.38072 83.0065 6.85855C82.9105 6.67786 82.8401 6.48467 82.7975 6.28455C83.174 6.9531 83.6547 7.55735 84.2215 8.07455C85.8954 9.34894 87.9715 9.97957 90.0715 9.85155C91.5274 9.77563 92.9718 9.55215 94.3825 9.18455C96.0376 8.75009 97.72 8.42769 99.4185 8.21955C100.363 8.12162 101.316 8.14851 102.253 8.29955C103.24 8.48088 104.187 8.83174 105.053 9.33655C105.967 9.86416 106.75 10.5896 107.346 11.4595C107.974 12.392 108.249 13.5177 108.121 14.6345L107.658 14.2995C108.019 14.1505 108.386 13.9815 108.771 13.8385C109.171 13.7295 109.562 13.5795 109.971 13.5015C112.094 13.0645 114.294 13.1984 116.348 13.8895C118.402 14.5806 120.235 15.8043 121.661 17.4355C122.888 18.8836 123.697 20.6379 124.002 22.5105C124.262 24.1294 124.184 25.7846 123.771 27.3715C123.215 29.6742 121.974 31.7542 120.212 33.3375C119.741 33.7648 119.222 34.1363 118.665 34.4445C118.481 34.5668 118.282 34.6637 118.071 34.7325\" fill=\"#375A64\"/>\n            <path id=\"Fill 180\" d=\"M120.049 6.45955C119.3 5.93045 118.473 5.5209 117.597 5.24555C116.593 4.97134 115.538 4.93166 114.515 5.12955C113.195 5.36061 111.988 6.02281 111.084 7.01255L110.725 7.41255L110.603 6.89155C110.153 5.28384 109.283 3.82501 108.083 2.66505C106.882 1.50508 105.394 0.685838 103.771 0.291551C101.088 -0.373449 98.4535 0.536551 96.2415 1.45955C94.2779 2.41451 92.2223 3.16738 90.1065 3.70655C88.651 4.05464 87.1321 4.03816 85.6845 3.65855C85.2969 3.54491 84.9232 3.38827 84.5705 3.19155C84.3325 3.04955 84.2155 2.96655 84.2255 2.94755C84.2525 2.89155 84.7555 3.18355 85.7475 3.41355C87.1608 3.68326 88.6168 3.62959 90.0065 3.25655C92.0744 2.66043 94.0829 1.87476 96.0065 0.909551C97.1922 0.372493 98.4278 -0.0468514 99.6955 -0.342449C101.088 -0.659361 102.534 -0.658336 103.925 -0.339449C105.66 0.0792821 107.248 0.960843 108.52 2.21123C109.793 3.46162 110.702 5.03395 111.151 6.76055L110.67 6.63955C111.669 5.57779 112.998 4.8861 114.44 4.67755C115.531 4.50076 116.647 4.58821 117.696 4.93255C118.366 5.14988 118.991 5.48627 119.541 5.92555C119.907 6.24455 120.071 6.44355 120.052 6.46155\" fill=\"#375A64\"/>\n            <path id=\"Fill 182\" d=\"M98.2605 47.6646C97.9986 47.3692 97.6755 47.1346 97.3137 46.9769C96.9519 46.8192 96.5601 46.7423 96.1655 46.7516C95.7181 46.7899 95.2838 46.9216 94.8905 47.1383C94.4972 47.355 94.1538 47.6518 93.8825 48.0096L93.8435 48.0516C93.8195 48.0846 93.7835 48.1116 93.7605 48.1456L93.7945 48.1276C93.5824 48.3843 93.4593 48.7029 93.4435 49.0356C93.4583 49.4079 93.5643 49.7708 93.7523 50.0926C93.9402 50.4143 94.2044 50.6849 94.5215 50.8806C95.0103 51.2145 95.5905 51.3887 96.1824 51.3792C96.7743 51.3697 97.3487 51.177 97.8265 50.8276C98.283 50.4513 98.5812 49.917 98.6616 49.3309C98.7421 48.7448 98.5988 48.1498 98.2605 47.6646Z\" fill=\"#FF4F5B\"/>\n            <path id=\"Fill 184\" d=\"M93.3675 46.1176C93.4765 46.0906 93.6405 46.5246 94.0515 47.0976C94.5693 47.8359 95.2885 48.4098 96.1235 48.7506C96.9695 49.061 97.8868 49.122 98.7665 48.9266C99.4545 48.7796 99.8665 48.5686 99.9285 48.6626C99.9825 48.7336 99.6585 49.1206 98.9205 49.4256C97.9374 49.8141 96.8443 49.8194 95.8575 49.4406C94.8724 49.0543 94.0676 48.3134 93.6015 47.3636C93.2615 46.6396 93.2805 46.1356 93.3675 46.1176Z\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 186\" d=\"M61.6455 23.3696C61.5123 23.2946 61.3893 23.2028 61.2795 23.0966C60.9515 22.8117 60.6428 22.5053 60.3555 22.1796C59.2685 20.9782 58.5015 19.5224 58.1255 17.9466C57.8771 16.845 57.8771 15.7021 58.1255 14.6006C58.4054 13.3243 59.0437 12.1545 59.9655 11.2286C60.4791 10.7169 61.0897 10.3128 61.7614 10.04C62.4331 9.76713 63.1525 9.631 63.8775 9.63956C64.6614 9.62433 65.4382 9.79104 66.1468 10.1266C66.8554 10.4622 67.4765 10.9575 67.9615 11.5736L67.5805 11.7736C67.5705 11.7466 67.5605 11.7146 67.5515 11.6846C66.4893 8.88308 66.5726 5.77606 67.7835 3.03556C68.2897 1.92642 69.0601 0.958353 70.0274 0.21618C70.9946 -0.525993 72.1291 -1.01962 73.3315 -1.22144C74.1417 -1.32344 74.9642 -1.26145 75.75 -1.03915C76.5357 -0.816847 77.2688 -0.438783 77.9055 0.0725555C78.2449 0.353466 78.5444 0.679488 78.7955 1.04156C78.8853 1.16464 78.9583 1.29916 79.0125 1.44156C78.6582 0.982421 78.2514 0.566265 77.8005 0.201555C76.5279 -0.738477 74.9369 -1.14072 73.3705 -0.918445C72.2307 -0.703264 71.1601 -0.215169 70.2502 0.504079C69.3402 1.22333 68.6181 2.15231 68.1455 3.21156C67.0077 5.86214 66.9463 8.85154 67.9745 11.5466C67.9845 11.5766 67.9945 11.6066 68.0035 11.6336L68.4225 12.9136L67.6225 11.8346C67.1768 11.2732 66.608 10.822 65.96 10.5157C65.3119 10.2095 64.6021 10.0565 63.8855 10.0686C63.2144 10.0577 62.5478 10.1803 61.9245 10.4292C61.3012 10.6781 60.7335 11.0484 60.2545 11.5186C59.3777 12.3858 58.7641 13.4834 58.4845 14.6846C58.2324 15.7344 58.214 16.8268 58.4305 17.8846C58.7728 19.4242 59.4781 20.8597 60.4875 22.0716C61.1945 22.9396 61.6775 23.3416 61.6495 23.3716\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 188\" d=\"M47.9955 50.4235C47.9247 50.4649 47.8496 50.4984 47.7715 50.5235L47.1025 50.7675C46.5115 50.9745 45.6405 51.2775 44.5025 51.6285C43.1218 52.0627 41.7171 52.4163 40.2955 52.6875C38.4032 53.0573 36.4669 53.1473 34.5485 52.9545C32.2008 52.7213 29.9575 51.8678 28.0485 50.4815C26.9701 49.6508 26.0677 48.6139 25.3937 47.4313C24.7198 46.2486 24.2876 44.9437 24.1225 43.5925C23.7521 40.6123 24.2257 37.5879 25.4895 34.8635C26.1261 33.4019 27.0742 32.0968 28.2675 31.0395C29.5263 29.9449 31.1354 29.3373 32.8035 29.3265C34.0022 29.3062 35.1734 29.6875 36.1305 30.4095L35.8395 30.7295C34.7982 29.584 34.0514 28.2022 33.6635 26.7035C33.3079 25.2544 33.247 23.7486 33.4845 22.2755C33.6961 20.8868 34.2003 19.5588 34.9637 18.3794C35.727 17.2001 36.7321 16.1963 37.9125 15.4345C40.0526 14.0908 42.5713 13.4785 45.0895 13.6895C47.273 13.8577 49.3592 14.663 51.0895 16.0055C52.4912 17.1149 53.6453 18.5054 54.4775 20.0875C55.0989 21.2738 55.541 22.5456 55.7895 23.8615C55.9472 24.6883 56.0209 25.5289 56.0095 26.3705C55.9935 26.6375 55.9795 26.8525 55.9685 27.0235C55.9676 27.098 55.9586 27.1721 55.9415 27.2445C55.9512 26.1199 55.847 24.9972 55.6305 23.8935C55.3565 22.6015 54.8985 21.3554 54.2705 20.1935C53.4342 18.6577 52.29 17.311 50.9095 16.2375C49.2185 14.952 47.1893 14.1874 45.0705 14.0375C42.6297 13.8481 40.1931 14.4532 38.1245 15.7625C36.9954 16.4986 36.0352 17.4656 35.3071 18.5998C34.5791 19.7339 34.0996 21.0096 33.9005 22.3425C33.6765 23.7578 33.738 25.2035 34.0815 26.5945C34.453 28.0216 35.1646 29.3375 36.1555 30.4295L35.8645 30.7495C34.9832 30.0879 33.9063 29.7392 32.8045 29.7585C31.239 29.7702 29.7293 30.3416 28.5485 31.3695C27.4033 32.3849 26.4926 33.6372 25.8795 35.0395C24.6422 37.6895 24.1711 40.6328 24.5195 43.5365C24.6723 44.8387 25.0822 46.0975 25.7254 47.2399C26.3686 48.3824 27.2324 49.3856 28.2665 50.1915C30.1206 51.5533 32.3022 52.4 34.5895 52.6455C36.4782 52.8525 38.387 52.7852 40.2565 52.4455C41.673 52.1937 43.075 51.8663 44.4565 51.4646L47.0765 50.6805L47.7585 50.4805C47.8352 50.4524 47.9152 50.4339 47.9965 50.4255\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 190\" d=\"M60.5355 63.5965C60.2341 63.8378 59.9063 64.0441 59.5585 64.2115C58.642 64.7254 57.6863 65.1661 56.7005 65.5295C55.2279 66.0926 53.6607 66.3669 52.0845 66.3375C50.1187 66.291 48.2321 65.5539 46.7555 64.2555C46.0095 63.5588 45.4398 62.6947 45.0935 61.7345C44.7798 60.8461 44.6192 59.9108 44.6185 58.9685C44.6346 57.3867 44.9626 55.8235 45.5835 54.3685C45.983 53.3969 46.4433 52.4514 46.9615 51.5375C47.1297 51.1901 47.3334 50.861 47.5695 50.5555C47.4505 50.922 47.2975 51.2766 47.1125 51.6145C46.8015 52.2865 46.3275 53.2485 45.8705 54.4815C45.3082 55.909 45.0192 57.4294 45.0185 58.9635C45.0028 59.8877 45.1749 60.8054 45.5243 61.6611C45.8738 62.5168 46.3933 63.2926 47.0515 63.9415C48.455 65.1679 50.2388 65.8722 52.1015 65.9355C53.6317 65.98 55.1571 65.7427 56.6015 65.2355C59.0845 64.3755 60.5015 63.5085 60.5375 63.5935\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 192\" d=\"M64.9405 68.9475C65.3168 68.8821 65.6754 68.7391 65.9935 68.5275C66.4005 68.2116 66.719 67.7957 66.9178 67.3203C67.1167 66.845 67.1893 66.3262 67.1285 65.8145C67.1065 65.4697 67.0106 65.1337 66.8474 64.8292C66.6842 64.5247 66.4574 64.2588 66.1825 64.0495C65.8807 63.8158 65.5097 63.6889 65.128 63.6889C64.7462 63.6889 64.3753 63.8158 64.0735 64.0495C63.9264 64.1873 63.8081 64.3529 63.7255 64.5368C63.643 64.7206 63.5977 64.9191 63.5925 65.1205C63.5893 65.3231 63.6406 65.5228 63.741 65.6987C63.8415 65.8747 63.9874 66.0203 64.1635 66.1205C64.5623 66.3304 65.02 66.4008 65.4635 66.3205C65.9371 66.2425 66.3895 66.0675 66.7925 65.8065C67.5583 65.2637 68.1869 64.5497 68.6283 63.7213C69.0698 62.8929 69.3119 61.9729 69.3355 61.0345C69.362 59.4701 69.0665 57.917 68.4675 56.4715C68.1504 55.465 67.6726 54.5164 67.0525 53.6625C66.9274 53.5211 66.7733 53.4083 66.6008 53.3317C66.4283 53.2551 66.2412 53.2165 66.0525 53.2185C66.1464 53.1683 66.2538 53.1487 66.3595 53.1625C66.6653 53.191 66.9516 53.325 67.1695 53.5415C67.5061 53.8724 67.7793 54.2622 67.9755 54.6915C68.2215 55.1725 68.4895 55.7255 68.7515 56.3565C69.411 57.8333 69.7465 59.4342 69.7355 61.0515C69.6988 62.0182 69.4643 62.9671 69.0465 63.8395C68.6029 64.7933 67.9002 65.6031 67.0185 66.1765C66.5802 66.4969 66.0644 66.6947 65.5243 66.7495C64.9842 66.8044 64.4392 66.7143 63.9455 66.4885C63.7063 66.3489 63.5089 66.1479 63.3735 65.9063C63.2381 65.6648 63.1698 65.3914 63.1755 65.1145C63.1836 64.8569 63.2434 64.6035 63.3513 64.3694C63.4591 64.1352 63.6129 63.9251 63.8035 63.7515C63.9874 63.5915 64.2012 63.4696 64.4326 63.3928C64.664 63.3161 64.9084 63.2861 65.1515 63.3045C65.5987 63.3342 66.0284 63.4903 66.3905 63.7545C66.7017 63.9975 66.9564 64.3053 67.1368 64.6565C67.3173 65.0077 67.4192 65.394 67.4355 65.7885C67.4885 66.3451 67.3916 66.9058 67.1547 67.4122C66.9179 67.9187 66.5497 68.3525 66.0885 68.6685C65.8364 68.8342 65.5484 68.937 65.2485 68.9685C65.1459 68.9882 65.0401 68.982 64.9405 68.9505\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 194\" d=\"M36.5095 51.0356C36.3901 51.0753 36.2653 51.0965 36.1395 51.0986C35.777 51.1096 35.4152 51.0593 35.0695 50.9496C34.4327 50.7278 33.856 50.3615 33.3844 49.8796C32.9129 49.3976 32.5593 48.813 32.3515 48.1716C32.1018 47.1994 32.1109 46.1789 32.3779 45.2113C32.6449 44.2438 33.1605 43.363 33.8735 42.6566C34.9173 41.5661 36.2349 40.7763 37.6885 40.3695C39.1422 39.9628 40.6784 39.9542 42.1365 40.3446L41.8745 40.6266C41.5292 39.5518 41.4622 38.4071 41.68 37.2994C41.8977 36.1918 42.393 35.1576 43.1195 34.2936C43.7433 33.5439 44.5426 32.9599 45.4465 32.5936C46.226 32.2939 47.0555 32.1456 47.8905 32.1566C49.0904 32.1651 50.2636 32.5117 51.2755 33.1566C51.5481 33.3255 51.801 33.5244 52.0295 33.7496C52.1845 33.9046 52.2605 33.9896 52.2515 34.0006C52.2225 34.0316 51.9005 33.7006 51.1945 33.2946C50.188 32.7279 49.0494 32.4377 47.8945 32.4536C47.0996 32.4643 46.3137 32.6237 45.5775 32.9236C44.7356 33.2797 43.9936 33.8366 43.4165 34.5456C42.7461 35.3618 42.2911 36.3331 42.0932 37.3707C41.8952 38.4082 41.9607 39.4788 42.2835 40.4846L42.4165 40.8716L42.0225 40.7656C40.6391 40.3981 39.183 40.4043 37.8028 40.7836C36.4226 41.1629 35.1678 41.9017 34.1665 42.9246C33.4905 43.5799 32.9952 44.3987 32.7287 45.3017C32.4623 46.2047 32.4336 47.1612 32.6455 48.0786C32.8306 48.6866 33.1492 49.2456 33.5781 49.7146C34.0071 50.1837 34.5354 50.5509 35.1245 50.7896C35.5719 50.9378 36.0384 51.021 36.5095 51.0366\" fill=\"#375A64\"/>\n            <path id=\"Fill 196\" d=\"M35.5165 25.5845C35.6864 25.477 35.8756 25.4033 36.0735 25.3675C36.6165 25.2338 37.1791 25.199 37.7345 25.2645C38.5861 25.3588 39.4042 25.6495 40.1245 26.1135C41.056 26.696 41.7808 27.5566 42.1965 28.5735L41.8445 28.5095C42.5262 27.7702 43.4469 27.295 44.4445 27.1675C45.8858 26.9792 47.3466 27.3164 48.5595 28.1175C49.5197 28.7658 50.3526 29.5851 51.0165 30.5345C51.4673 31.1604 51.8742 31.8166 52.2345 32.4985C52.386 32.7388 52.5034 32.999 52.5835 33.2715C52.5145 33.3135 51.9425 32.2455 50.7735 30.7205C50.0982 29.8322 49.276 29.0658 48.3425 28.4545C47.2036 27.7286 45.8459 27.4257 44.5065 27.5985C43.6098 27.712 42.7801 28.1325 42.1585 28.7885L41.9295 29.0345L41.8055 28.7245C41.4303 27.7807 40.7744 26.9747 39.9265 26.4155C39.2577 25.9597 38.4966 25.6569 37.6975 25.5285C36.9716 25.4423 36.237 25.4612 35.5165 25.5845\" fill=\"#375A64\"/>\n            </g>\n            <g id=\"arm\">\n            <path id=\"Fill 110\" d=\"M150.831 118.772L208.899 119.915L218.287 119.099C218.287 119.099 239.536 118.499 241.57 118.179C243.921 117.811 244.663 118.859 244.74 119.737C244.857 121.104 243.34 122.324 241.34 122.701C240.646 122.832 229.618 124.452 229.618 124.452C230.756 124.934 231.859 125.494 232.918 126.13C235.232 127.445 237.002 131.097 237.484 135.054C237.966 139.011 237.75 140.162 236.227 140.421C235.937 140.455 235.643 140.425 235.366 140.331C235.089 140.237 234.837 140.083 234.627 139.879C233.849 139.076 233.328 138.059 233.131 136.958C231.841 129.423 228.849 129.914 228.849 129.914L227.54 129.881C227.54 129.881 230.94 133.431 230.261 136.662C230.162 137.139 229.971 137.592 229.698 137.996C229.829 138.855 229.732 139.734 229.419 140.544C229.105 141.355 228.585 142.069 227.909 142.616C227.234 143.164 226.428 143.525 225.57 143.664C224.712 143.803 223.833 143.716 223.019 143.41C222.231 143.11 221.44 142.461 221.479 141.619C221.54 141.177 221.712 140.757 221.979 140.399C222.107 140.2 222.217 139.99 222.308 139.772L218.831 139.591C218.831 139.591 211.031 138.762 207.596 138.791L153.04 140.593C145.271 141.41 136.863 139.771 136.185 131.968C135.448 123.479 142.347 118.311 150.831 118.772Z\" fill=\"#FFBF9D\"/>\n            <path id=\"Fill 112\" d=\"M209.938 121.611C209.945 122.219 210.143 122.81 210.504 123.299C210.864 123.789 211.369 124.154 211.948 124.341C213.065 124.807 214.309 124.879 215.458 125.265C218.892 126.414 221.025 130.155 224.511 131.136C224.996 131.272 225.639 131.289 225.875 130.842C226.095 130.428 225.795 129.942 225.508 129.566C223.059 126.396 220.611 123.226 218.163 120.055\" fill=\"#FFBF9D\"/>\n            <path id=\"Fill 114\" d=\"M218.16 120.054C218.501 120.328 218.804 120.646 219.06 121.001C219.605 121.639 220.374 122.574 221.313 123.739L224.585 127.854C224.891 128.245 225.205 128.643 225.523 129.054C225.977 129.482 226.246 130.07 226.273 130.693C226.24 130.893 226.147 131.078 226.007 131.225C225.868 131.372 225.687 131.473 225.489 131.516C225.165 131.586 224.828 131.577 224.508 131.491C223.938 131.332 223.388 131.109 222.868 130.826C220.78 129.673 219.322 127.997 217.751 126.864C217.035 126.308 216.239 125.863 215.39 125.544C214.595 125.263 213.784 125.137 213.049 124.944C212.438 124.845 211.857 124.613 211.346 124.264C210.835 123.916 210.407 123.459 210.092 122.927C209.969 122.734 209.89 122.515 209.864 122.287C209.837 122.06 209.862 121.829 209.937 121.612C209.995 122.027 210.125 122.429 210.323 122.798C210.654 123.258 211.078 123.643 211.566 123.93C212.055 124.218 212.597 124.4 213.16 124.467C213.876 124.628 214.696 124.726 215.571 125.004C216.486 125.319 217.347 125.774 218.122 126.354C219.772 127.511 221.254 129.164 223.19 130.22C223.66 130.474 224.156 130.677 224.67 130.825C225.152 130.953 225.606 130.855 225.61 130.587C225.662 130.295 225.325 129.857 225.01 129.453C224.695 129.049 224.392 128.638 224.091 128.243L220.935 124.043C220.046 122.843 219.335 121.858 218.856 121.172C218.573 120.833 218.339 120.457 218.16 120.054\" fill=\"#FF9A6C\"/>\n            <path id=\"Fill 116\" d=\"M227.542 129.881C228.307 129.839 229.072 129.976 229.775 130.281C230.503 130.654 231.093 131.249 231.459 131.981C231.906 132.901 232.206 133.886 232.349 134.899C232.495 135.947 232.747 136.978 233.102 137.975C233.408 138.809 233.929 139.547 234.613 140.115C234.852 140.307 235.132 140.441 235.432 140.505C235.732 140.57 236.042 140.563 236.339 140.486C236.554 140.44 236.751 140.336 236.911 140.186C236.892 140.146 236.687 140.253 236.301 140.32C236.034 140.359 235.762 140.34 235.504 140.262C235.245 140.185 235.007 140.052 234.806 139.872C234.202 139.31 233.746 138.607 233.479 137.826C233.157 136.846 232.922 135.84 232.779 134.818C232.629 133.759 232.303 132.733 231.813 131.783C231.395 130.989 230.722 130.358 229.903 129.992C229.355 129.756 228.757 129.66 228.163 129.715C227.747 129.761 227.535 129.857 227.542 129.881Z\" fill=\"#FF9A6C\"/>\n            <path id=\"Fill 118\" d=\"M242.108 122.537C241.369 122.574 240.634 122.677 239.913 122.845C238.413 123.094 236.626 123.39 234.651 123.72L229.375 124.52C228.638 124.581 227.907 124.709 227.193 124.902C227.933 124.959 228.677 124.932 229.411 124.823C230.775 124.706 232.655 124.48 234.719 124.153C236.783 123.826 238.64 123.459 239.974 123.153C240.706 123.028 241.422 122.822 242.108 122.537Z\" fill=\"#FF9A6C\"/>\n            <path id=\"Fill 120\" d=\"M225.444 132.757C225.417 132.777 225.561 132.985 225.792 133.357C225.966 133.597 226.087 133.871 226.146 134.162C226.205 134.452 226.201 134.752 226.134 135.041C226.07 135.222 225.961 135.384 225.815 135.509C225.67 135.635 225.495 135.72 225.306 135.757C224.833 135.855 224.35 135.894 223.868 135.874C223.261 135.838 222.661 136.027 222.184 136.404C221.946 136.638 221.767 136.924 221.66 137.24C221.554 137.556 221.524 137.893 221.572 138.223C221.623 138.546 221.739 138.856 221.913 139.133C222.087 139.411 222.316 139.649 222.586 139.835C223.069 140.189 223.646 140.391 224.244 140.414C225.199 140.392 226.145 140.23 227.053 139.933C227.671 139.751 228.255 139.465 228.778 139.089C229.139 138.801 229.263 138.567 229.245 138.558C229.212 138.532 229.051 138.719 228.681 138.948C228.142 139.254 227.564 139.484 226.963 139.632C226.08 139.876 225.169 140.001 224.253 140.005C223.729 139.989 223.225 139.8 222.819 139.467C222.414 139.134 222.129 138.677 222.011 138.166C221.973 137.906 221.995 137.64 222.076 137.39C222.157 137.14 222.294 136.912 222.478 136.724C222.879 136.414 223.377 136.258 223.883 136.284C224.399 136.294 224.914 136.236 225.415 136.11C225.654 136.05 225.873 135.929 226.051 135.759C226.23 135.589 226.361 135.376 226.433 135.14C226.502 134.81 226.493 134.468 226.406 134.143C226.319 133.817 226.157 133.516 225.933 133.264C225.653 132.907 225.467 132.742 225.444 132.757Z\" fill=\"#FF9A6C\"/>\n            <path id=\"Fill 122\" d=\"M222.892 139.603C222.892 139.581 222.649 139.557 222.28 139.761C222.022 139.915 221.803 140.127 221.641 140.38C221.479 140.633 221.378 140.921 221.346 141.22C221.317 141.668 221.405 142.115 221.601 142.518C221.797 142.922 222.095 143.267 222.465 143.52C223.367 144.116 224.464 144.341 225.528 144.148C226.585 143.987 227.565 143.497 228.328 142.748C228.939 142.136 229.376 141.373 229.595 140.536C229.747 139.98 229.794 139.4 229.733 138.827C229.68 138.42 229.599 138.215 229.574 138.22C229.586 138.972 229.493 139.721 229.297 140.447C229.052 141.211 228.621 141.902 228.041 142.457C227.328 143.125 226.429 143.563 225.463 143.712C224.508 143.887 223.523 143.7 222.699 143.187C222.376 142.977 222.112 142.688 221.93 142.349C221.748 142.009 221.654 141.629 221.658 141.244C221.675 140.983 221.748 140.728 221.871 140.497C221.995 140.267 222.166 140.065 222.374 139.906C222.674 139.68 222.901 139.64 222.892 139.606\" fill=\"#FF9A6C\"/>\n            <path id=\"Fill 124\" d=\"M214.356 133.14C214.405 132.78 214.343 132.413 214.179 132.088C213.846 131.219 213.233 130.486 212.438 130.004L212.392 130.391C212.878 130.263 213.356 130.106 213.822 129.919C215.485 129.333 216.953 128.296 218.062 126.925C216.688 127.94 215.21 128.806 213.652 129.508C213.179 129.697 212.712 129.856 212.275 129.982L211.792 130.125L212.226 130.372C212.96 130.802 213.554 131.435 213.936 132.196C214.223 132.766 214.299 133.151 214.356 133.14Z\" fill=\"#FF9A6C\"/>\n            <path id=\"Fill 126\" d=\"M233.135 130.44C233.065 130.344 232.341 130.892 232.077 131.929C231.813 132.966 232.167 133.795 232.277 133.744C232.402 133.711 232.265 132.939 232.508 132.044C232.729 131.137 233.224 130.529 233.135 130.44Z\" fill=\"#FF9A6C\"/>\n            <path id=\"Fill 128\" d=\"M107 82C107.9 83.267 147.588 114.775 152.5 116.1C157.412 117.425 202.771 118.1 202.771 118.1C202.771 118.1 206.318 146.08 205.149 147.979C200.842 154.966 149.024 173.424 124.303 148.414L107 84.99\" fill=\"#005635\"/>\n            </g>\n            <g id=\"Body\">\n            <g id=\"Group 15\">\n            <path id=\"Fill 200\" d=\"M52.529 429.924L44.81 457.924C44.81 457.924 71.054 473.124 70.129 478.441L15.001 467.445L25.242 423.324L52.529 429.924Z\" fill=\"#DA2C2C\"/>\n            <path id=\"Fill 204\" d=\"M15 467.445L16.033 462.997L68.9 475.476C69.4032 475.883 69.7972 476.409 70.0465 477.006C70.2957 477.603 70.3925 478.253 70.328 478.897L15 467.445Z\" fill=\"white\"/>\n            <path id=\"Fill 206\" d=\"M45.763 457.851C45.691 458.117 44.327 457.919 42.809 458.466C41.276 458.974 40.324 459.973 40.103 459.808C39.87 459.695 40.647 458.195 42.498 457.561C44.341 456.915 45.879 457.62 45.763 457.851Z\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 208\" d=\"M50.933 461.599C50.933 461.873 49.668 462.053 48.492 462.969C47.289 463.849 46.77 465.02 46.508 464.945C46.246 464.926 46.433 463.315 47.916 462.203C49.399 461.091 50.987 461.344 50.933 461.603\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 210\" d=\"M52.554 469.26C52.299 469.26 52.244 467.832 53.278 466.529C54.312 465.226 55.698 464.942 55.759 465.192C55.859 465.448 54.859 466.042 54.028 467.124C53.17 468.186 52.826 469.296 52.554 469.26Z\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 212\" d=\"M46.815 451.276C46.645 451.493 45.508 450.832 43.975 450.576C42.446 450.284 41.152 450.511 41.068 450.245C40.962 450.018 42.34 449.301 44.142 449.63C45.944 449.959 46.997 451.096 46.815 451.276Z\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 214\" d=\"M50.993 435.464L49.623 440.456L22.812 433.792L23.854 429.248L50.993 435.464Z\" fill=\"black\"/>\n            <path id=\"Fill 216\" d=\"M48.269 445.597C48.246 445.709 47.152 445.623 45.533 444.929C44.5882 444.517 43.6972 443.99 42.88 443.362C42.3939 442.991 41.9345 442.586 41.505 442.15C41.2382 441.906 41.0108 441.622 40.831 441.308C40.7004 441.076 40.651 440.806 40.6905 440.543C40.73 440.279 40.8561 440.036 41.049 439.852C41.2267 439.698 41.4382 439.587 41.6665 439.53C41.8948 439.472 42.1334 439.469 42.363 439.521C42.711 439.601 43.0455 439.732 43.356 439.908C43.9062 440.19 44.4294 440.522 44.919 440.9C45.7433 441.539 46.4624 442.303 47.05 443.165C48.038 444.647 48.234 445.749 48.129 445.781C47.988 445.84 47.569 444.854 46.51 443.575C45.8925 442.832 45.182 442.172 44.396 441.611C43.9343 441.285 43.4471 440.996 42.939 440.748C42.397 440.458 41.904 440.336 41.694 440.56C41.617 440.644 41.602 440.687 41.68 440.88C41.8169 441.108 41.9852 441.316 42.18 441.497C42.5724 441.913 42.9888 442.305 43.427 442.672C44.1757 443.295 44.9808 443.847 45.832 444.321C46.6734 444.688 47.4877 445.115 48.269 445.597Z\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 218\" d=\"M47.83 445.899C47.726 445.918 47.423 444.832 47.739 443.071C48.046 441.427 48.8 439.9 49.918 438.657C50.1504 438.33 50.4638 438.068 50.8275 437.898C51.1913 437.729 51.5928 437.656 51.993 437.688C52.2359 437.75 52.4557 437.881 52.6263 438.065C52.7968 438.249 52.9109 438.478 52.955 438.725C53.0204 439.079 53.0352 439.441 52.999 439.799C52.9471 440.435 52.7991 441.059 52.56 441.65C52.1657 442.641 51.5326 443.519 50.717 444.206C49.312 445.371 48.122 445.426 48.122 445.331C48.065 445.176 49.117 444.88 50.26 443.711C50.9194 443.036 51.4237 442.226 51.738 441.336C51.9216 440.821 52.0313 440.282 52.064 439.736C52.117 439.136 52.011 438.61 51.779 438.619C51.509 438.549 50.942 438.878 50.609 439.289C50.2257 439.7 49.8799 440.144 49.576 440.617C49.0621 441.428 48.6659 442.308 48.399 443.231C47.938 444.822 47.985 445.892 47.83 445.899Z\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 220\" d=\"M133.078 428.225L136.503 457.071C136.503 457.071 166.533 461.185 167.684 466.455L112.505 477.203L105.332 432.478L133.078 428.225Z\" fill=\"#DA2C2C\"/>\n            <path id=\"Fill 222\" d=\"M118.955 457.338C118.445 457.585 118.044 458.011 117.829 458.535C117.614 459.059 117.6 459.644 117.79 460.178C118.015 460.698 118.431 461.11 118.953 461.331C119.474 461.551 120.061 461.562 120.59 461.361C121.129 461.097 121.551 460.643 121.775 460.087C122 459.53 122.011 458.911 121.806 458.347C121.515 457.83 121.034 457.447 120.466 457.277C119.897 457.108 119.285 457.167 118.759 457.44\" fill=\"white\"/>\n            <path id=\"Fill 224\" d=\"M112.506 477.203L111.783 472.695L165.421 464.177C166.041 464.362 166.606 464.699 167.063 465.158C167.52 465.617 167.855 466.182 168.038 466.803L112.506 477.203Z\" fill=\"white\"/>\n            <path id=\"Fill 226\" d=\"M137.355 456.646C137.388 456.919 136.055 457.254 134.855 458.337C133.629 459.39 133.124 460.673 132.855 460.605C132.599 460.595 132.755 458.902 134.226 457.617C135.697 456.332 137.379 456.389 137.355 456.646Z\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 232\" d=\"M135.85 450.159C135.774 450.423 134.472 450.243 132.955 450.586C131.432 450.899 130.32 451.603 130.142 451.39C129.955 451.218 130.962 450.03 132.756 449.651C134.55 449.272 135.949 449.93 135.85 450.159Z\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 234\" d=\"M133.748 433.94L134.365 439.079L107.033 443.09L106.283 438.489L133.748 433.94Z\" fill=\"black\"/>\n            <path id=\"Fill 236\" d=\"M135.052 444.353C135.072 444.465 134.026 444.8 132.267 444.773C131.237 444.75 130.213 444.601 129.219 444.33C128.629 444.171 128.052 443.97 127.49 443.73C127.15 443.605 126.832 443.428 126.547 443.205C126.339 443.039 126.192 442.809 126.129 442.55C126.066 442.291 126.091 442.019 126.2 441.776C126.306 441.566 126.459 441.384 126.648 441.244C126.837 441.105 127.056 441.011 127.287 440.971C127.641 440.911 128.001 440.905 128.357 440.951C128.973 441.003 129.582 441.113 130.178 441.277C131.182 441.555 132.136 441.99 133.004 442.565C134.478 443.56 135.076 444.507 134.992 444.574C134.883 444.683 134.124 443.929 132.659 443.147C131.806 442.694 130.899 442.353 129.959 442.132C129.409 442.006 128.85 441.924 128.287 441.888C127.676 441.821 127.174 441.899 127.064 442.185C127.026 442.293 127.025 442.335 127.174 442.485C127.386 442.644 127.619 442.773 127.866 442.868C128.387 443.103 128.921 443.307 129.466 443.48C130.394 443.773 131.347 443.979 132.313 444.095C133.231 444.115 134.146 444.201 135.051 444.351\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 238\" d=\"M134.76 444.798C134.67 444.855 133.981 443.965 133.608 442.218C133.401 441.193 133.368 440.141 133.513 439.105C133.601 438.489 133.751 437.884 133.959 437.298C134.052 436.908 134.244 436.548 134.517 436.254C134.789 435.959 135.133 435.74 135.515 435.617C135.764 435.584 136.016 435.623 136.244 435.73C136.471 435.836 136.663 436.005 136.797 436.217C136.99 436.52 137.14 436.85 137.241 437.195C137.433 437.802 137.532 438.434 137.535 439.07C137.544 440.137 137.289 441.191 136.794 442.136C135.932 443.747 134.851 444.25 134.814 444.161C135.315 443.418 135.771 442.646 136.182 441.85C136.537 440.976 136.699 440.035 136.655 439.092C136.631 438.547 136.53 438.009 136.355 437.492C136.174 436.91 135.879 436.467 135.667 436.562C135.391 436.6 134.99 437.119 134.837 437.626C134.637 438.151 134.485 438.693 134.383 439.246C134.212 440.192 134.176 441.157 134.276 442.113C134.453 443.761 134.901 444.734 134.76 444.798Z\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 240\" d=\"M91.42 342.818C91.42 343.847 104.042 442.786 104.042 442.786L140.696 435.803L125.94 333.686L91.42 342.818Z\" fill=\"#19201F\"/>\n            <path id=\"Fill 242\" d=\"M46.736 332.241C46.394 333.211 20.901 433.088 20.901 433.088L55.767 441.15L85.645 333.687L46.736 332.241Z\" fill=\"#19201F\"/>\n            </g>\n            <g id=\"Group 17\">\n            <path id=\"Fill 142\" d=\"M120.1 97.442C120.233 97.7421 120.395 98.0284 120.584 98.297C120.91 98.849 121.451 99.624 122.057 100.678C123.795 103.634 125.324 106.708 126.631 109.878C128.544 114.592 130.082 119.451 131.231 124.407C132.612 130.487 133.635 136.642 134.295 142.842C135.037 149.442 135.487 155.759 135.695 161.508C135.903 167.257 135.872 172.444 135.843 176.801C135.824 181.101 135.809 184.601 135.797 187.123C135.813 188.285 135.824 189.218 135.834 189.93C135.823 190.257 135.844 190.585 135.897 190.908C135.956 190.586 135.983 190.259 135.979 189.931C136.002 189.22 136.035 188.287 136.079 187.131C136.146 184.613 136.237 181.109 136.349 176.812C136.441 172.455 136.52 167.259 136.349 161.49C136.178 155.721 135.749 149.39 135 142.766C134.338 136.537 133.292 130.355 131.868 124.255C130.682 119.275 129.084 114.401 127.092 109.685C125.737 106.512 124.132 103.451 122.292 100.532C121.647 99.496 121.067 98.742 120.7 98.215C120.525 97.9386 120.324 97.6798 120.1 97.442\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 250\" d=\"M65.986 82.513C66.0762 82.597 66.177 82.6686 66.286 82.726C66.524 82.875 66.819 83.059 67.186 83.286L70.665 85.406C72.175 86.33 74.023 87.46 76.132 88.824C77.178 89.511 78.313 90.244 79.418 91.114C79.6698 91.2979 79.8943 91.5164 80.085 91.763C80.135 92.056 80.169 92.48 80.211 92.841C80.298 93.592 80.396 94.363 80.511 95.15C81.0144 98.5838 81.7109 101.987 82.597 105.342C83.5577 109.224 84.9756 112.979 86.821 116.527C88.88 120.339 92.541 123.088 95.921 126.057C97.6894 127.507 99.2305 129.213 100.493 131.12C101.756 133.081 102.285 135.426 101.986 137.739C101.558 140.066 100.898 142.343 100.017 144.539C99.2289 146.76 98.7688 149.085 98.651 151.439C98.5325 155.885 99.3149 160.309 100.951 164.444C102.38 168.17 104.163 171.751 106.275 175.137C108.218 178.33 110.136 181.226 111.875 183.875C115.375 189.163 118.153 193.468 119.955 196.518C120.861 198.039 121.538 199.237 121.991 200.053C122.202 200.429 122.372 200.734 122.51 200.978C122.563 201.088 122.63 201.191 122.71 201.283C122.681 201.165 122.636 201.051 122.577 200.945C122.456 200.692 122.305 200.377 122.12 199.986C121.707 199.147 121.068 197.925 120.197 196.379C118.463 193.279 115.738 188.924 112.297 183.601C110.583 180.934 108.69 178.023 106.78 174.833C104.709 171.468 102.962 167.913 101.563 164.218C99.9753 160.162 99.2193 155.828 99.34 151.474C99.4585 149.185 99.9096 146.925 100.679 144.765C101.58 142.525 102.253 140.2 102.686 137.825C103.005 135.352 102.441 132.847 101.093 130.749C99.7929 128.784 98.204 127.026 96.38 125.534C92.951 122.54 89.38 119.863 87.389 116.203C85.556 112.708 84.1383 109.011 83.165 105.187C82.262 101.858 81.5419 98.4818 81.008 95.074C80.883 94.294 80.78 93.53 80.683 92.783C80.631 92.396 80.612 92.072 80.534 91.648C80.3287 91.2904 80.0423 90.9859 79.698 90.759C78.548 89.877 77.408 89.165 76.344 88.489C74.209 87.152 72.338 86.058 70.806 85.169L67.254 83.163L66.318 82.663C66.2147 82.5982 66.103 82.5477 65.986 82.513\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 252\" d=\"M67.653 173.075C68.8191 173.135 69.9871 173.006 71.112 172.693C73.8652 172.076 76.4983 171.01 78.906 169.539C81.3174 168.066 83.4709 166.208 85.281 164.039C86.0739 163.179 86.7238 162.197 87.206 161.131C87.027 160.963 84.121 165.572 78.539 168.931C73.004 172.365 67.587 172.839 67.653 173.075Z\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 254\" d=\"M65.444 175.464C66.2858 175.825 67.1789 176.053 68.091 176.139C70.2616 176.498 72.4591 176.668 74.659 176.647C76.8592 176.632 79.054 176.428 81.219 176.036C82.1302 175.936 83.0203 175.694 83.857 175.32C83.815 175.106 79.744 175.914 74.654 175.939C69.57 175.993 65.482 175.249 65.444 175.464Z\" fill=\"#1A2E35\"/>\n            <g id=\"Group 16\">\n            <path id=\"Fill 138\" d=\"M106.212 80.706L112.143 84.05L131.213 116.143L131.138 132.943C131.138 132.943 135.62 144.701 135.9 154.129C136.18 163.557 135.9 198.104 135.9 198.104L159.985 358.202L139.402 364.87L98.651 178.447V78.178L106.212 80.706Z\" fill=\"#E0934A\"/>\n            <path id=\"Fill 140\" d=\"M139.401 364.871L155.688 359.594L132.378 185.917C132.378 185.917 136.278 160.461 132.378 149.311C128.478 138.161 122.516 121.765 122.516 121.765L129.316 152.859C128.46 176.142 129.877 203.948 132.376 233.902H126.142L139.401 364.871Z\" fill=\"black\"/>\n            <path id=\"Fill 198\" d=\"M73.76 73L104.512 77.365L105.882 87.121C105.882 87.121 121.16 113.919 122.517 121.764C123.874 129.609 130.679 149.046 129.317 163.711C127.955 178.376 132.377 233.902 132.377 233.902H124.56L94.291 159.959L73.76 73Z\" fill=\"#F1F1F1\"/>\n            <path id=\"Fill 244\" d=\"M79.589 76.155L72.414 73.702L59.884 90.876L56.514 146.042L65.172 174.46C65.172 174.46 40.772 228.533 40.372 241.954C39.972 255.375 29.014 380.344 29.014 380.344L141.921 389.57L121.062 185.118C121.062 185.118 118.306 134.99 115.162 127.491C112.018 119.992 79.589 76.155 79.589 76.155Z\" fill=\"#E0934A\"/>\n            <path id=\"Fill 246\" d=\"M69.895 253.821C69.885 253.844 70.038 253.921 70.338 254.046C70.7835 254.214 71.2448 254.338 71.715 254.414C73.4706 254.641 75.255 254.381 76.872 253.66C79.2604 252.559 81.2818 250.794 82.695 248.576C84.3901 245.896 85.7344 243.011 86.695 239.989C88.5403 234.547 89.5189 228.849 89.595 223.103C89.6119 221.367 89.5371 219.631 89.371 217.903C89.3387 217.267 89.2411 216.637 89.08 216.021C89.0295 216.654 89.0369 217.29 89.102 217.921C89.133 219.143 89.184 220.91 89.102 223.087C88.8793 228.762 87.8455 234.375 86.032 239.757C85.0886 242.721 83.7877 245.559 82.158 248.208C80.831 250.352 78.9298 252.081 76.67 253.2C75.1378 253.931 73.4427 254.254 71.749 254.138C70.552 254.021 69.919 253.758 69.895 253.821Z\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 248\" d=\"M29.015 380.344C29.015 380.344 29.203 380.379 29.574 380.422C29.974 380.462 30.516 380.516 31.221 380.588C32.702 380.722 34.84 380.916 37.593 381.167L61.307 383.21C81.507 384.89 109.723 387.24 141.895 389.91L142.309 389.945L142.267 389.531C141.367 380.651 140.426 371.443 139.467 362.019C135.467 323.219 131.847 288.101 129.223 262.649C127.882 249.96 126.795 239.683 126.039 232.549L125.139 224.368C125.03 223.456 124.947 222.748 124.888 222.243C124.826 221.768 124.777 221.525 124.777 221.525C124.777 221.525 124.777 221.773 124.815 222.254C124.857 222.762 124.915 223.472 124.997 224.388C125.176 226.288 125.433 229.046 125.766 232.581C126.466 239.723 127.478 250.01 128.727 262.71C131.298 288.164 134.844 323.291 138.763 362.094C139.727 371.516 140.668 380.723 141.576 389.603L141.95 389.223L61.342 382.758L37.615 380.925L31.235 380.463L29.581 380.363C29.21 380.343 29.018 380.349 29.018 380.349\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 260\" d=\"M23.145 160.055C23.468 151.607 39.523 118.207 39.523 118.207C39.523 118.207 46.966 101.607 48.723 98.25C52.538 90.95 63.192 90.188 67.031 92.399L64.053 133.607L55.236 163.631L72.417 196.138L51.023 217.267C22.495 213.691 22.82 168.507 23.145 160.055Z\" fill=\"#005635\"/>\n            </g>\n            <path id=\"Fill 262\" d=\"M30.127 164.638C31.4511 164.69 32.7733 164.496 34.027 164.067C36.402 163.477 39.491 162.09 43.034 161.247C44.6866 160.839 46.3962 160.712 48.091 160.871C49.4636 161.025 50.7906 161.457 51.991 162.14C53.0789 162.825 54.032 163.704 54.803 164.733C54.7319 164.377 54.5777 164.044 54.353 163.759C53.8007 162.94 53.0859 162.244 52.253 161.713C51.018 160.924 49.6255 160.415 48.173 160.222C46.4034 160.016 44.6112 160.128 42.881 160.553C39.22 161.428 36.188 162.887 33.887 163.586C31.602 164.344 30.115 164.527 30.127 164.638Z\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 264\" d=\"M40.128 151.847C41.1542 152.132 42.2048 152.32 43.266 152.41C45.7733 152.707 48.2057 153.457 50.445 154.623C52.6257 155.863 54.2393 157.902 54.945 160.31C55.1474 161.33 55.21 162.373 55.131 163.41C55.169 163.422 55.31 163.142 55.431 162.59C55.5918 161.8 55.5918 160.986 55.431 160.196C55.1307 158.898 54.5633 157.678 53.7649 156.612C52.9665 155.546 51.9547 154.658 50.794 154.005C48.4824 152.785 45.9372 152.071 43.328 151.912C42.2688 151.751 41.1929 151.729 40.128 151.847Z\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 266\" d=\"M48.337 217.614C48.8779 217.468 49.4011 217.264 49.897 217.003C51.2895 216.38 52.6432 215.674 53.951 214.889C55.9019 213.738 57.7728 212.456 59.551 211.053C61.7203 209.318 63.7592 207.426 65.651 205.392C67.5177 203.334 69.231 201.142 70.777 198.833C72.026 196.94 73.1465 194.964 74.131 192.921C74.8038 191.55 75.3938 190.14 75.898 188.698C76.1142 188.181 76.2728 187.641 76.371 187.089C76.247 187.04 75.441 189.289 73.678 192.696C72.6417 194.685 71.4905 196.611 70.23 198.466C68.6755 200.726 66.9717 202.879 65.13 204.912C63.2613 206.919 61.262 208.799 59.145 210.542C57.4049 211.953 55.5846 213.261 53.693 214.461C50.451 216.504 48.281 217.489 48.337 217.614Z\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 268\" d=\"M55.236 163.631C55.9173 162.225 56.4834 160.766 56.929 159.268C57.875 156.538 59.107 152.739 60.337 148.502C61.567 144.265 62.554 140.391 63.193 137.568C63.6094 136.062 63.8971 134.523 64.053 132.968C63.5028 134.429 63.0538 135.926 62.709 137.449C61.945 140.232 60.884 144.074 59.658 148.302C58.435 152.426 57.33 156.154 56.458 159.112C55.942 160.587 55.5336 162.097 55.236 163.631Z\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 270\" d=\"M72.416 196.138C72.589 196.047 68.883 188.694 64.139 179.719C59.395 170.744 55.408 163.54 55.236 163.63C55.064 163.72 58.769 171.072 63.513 180.05C68.257 189.028 72.243 196.228 72.413 196.136\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 272\" d=\"M83.842 364.313C84.036 364.294 82.998 351.165 81.522 334.987C80.046 318.809 78.693 305.705 78.497 305.723C78.301 305.741 79.341 318.869 80.817 335.05C82.293 351.231 83.646 364.33 83.842 364.313Z\" fill=\"#1A2E35\"/>\n            </g>\n            <path id=\"Fill 274\" d=\"M71.161 369.65C71.353 369.688 72.671 364.008 74.106 356.962C75.541 349.916 76.551 344.173 76.358 344.133C76.165 344.093 74.848 349.774 73.413 356.821C71.978 363.868 70.97 369.611 71.161 369.65Z\" fill=\"#1A2E35\"/>\n            <path id=\"Fill 276\" d=\"M81.851 335.679C81.859 335.879 93.784 335.573 108.487 335.002C123.19 334.431 135.105 333.81 135.097 333.614C135.089 333.418 123.165 333.722 108.458 334.291C93.751 334.86 81.843 335.483 81.851 335.679Z\" fill=\"#FAFAFA\"/>\n            <path id=\"Fill 278\" d=\"M32.537 341.421C32.542 341.621 43.52 341.497 57.055 341.154C70.59 340.811 81.562 340.373 81.556 340.178C81.55 339.983 70.576 340.1 57.037 340.443C43.498 340.786 32.537 341.224 32.537 341.42\" fill=\"#FAFAFA\"/>\n            <path id=\"Fill 280\" d=\"M80.718 321.369C80.728 321.569 92.718 321.169 107.494 320.479C122.27 319.789 134.248 319.074 134.238 318.879C134.228 318.684 122.244 319.079 107.461 319.769C92.678 320.459 80.71 321.173 80.718 321.369Z\" fill=\"#FAFAFA\"/>\n            <path id=\"Fill 282\" d=\"M33.669 327.681C33.674 327.881 44.211 327.7 57.198 327.281C70.185 326.862 80.714 326.374 80.707 326.178C80.7 325.982 70.169 326.16 57.176 326.574C44.183 326.988 33.662 327.485 33.669 327.681Z\" fill=\"#FAFAFA\"/>\n            </g>\n            </g>\n            <defs>\n            <clipPath id=\"clip0\">\n            <rect width=\"238.357\" height=\"482.977\" fill=\"white\"/>\n            </clipPath>\n            </defs>\n          </svg>\n        </div>\n\n        \n\n        <h1 class=\"anim-in\">Hey ", "</h1>\n\n        \n        <h2 class=\"quote\" > \u201CAs you read a book word by word and page by page, you participate in its creation, just as a cellist playing a Bach suite participates, note by note, in the creation, the coming-to-be, the existence, of the music. And, as you read and re-read, the book of course participates in the creation of you, your thoughts and feelings, the size and temper of your soul.\u201D  <span> \u2013 Ursula K. Le Guin </span></h2>\n    \n        \n        </div>\n       \n        \n        <p>&nbsp;</p>\n\n        <h2 class=\"explore\"> Explore </h2>\n      \n        <span class=\"divider\"></span>\n        \n        <div class= \"filter-menu\">\n\n        <sl-button class=\"anim-in1\" @click=", " >Guide</sl-button>\n        <sl-button class=\"anim-in1\" @click=", " >Action</sl-button>\n        <sl-button class=\"anim-in1\" @click=", " >Crime</sl-button>\n        <sl-button class=\"anim-in1\" @click=", " >Fantasy</sl-button>\n        <sl-button class=\"anim-in1\" @click=", " >Horror</sl-button>\n        <sl-button class=\"anim-in1\" @click=", " >Memoir</sl-button>\n        <sl-button class=\"anim-in1\" @click=", " >Romance</sl-button>\n        <sl-button class=\"anim-in1\" @click=", " >Poetry</sl-button>\n        <sl-button class=\"anim-in1\" @click=", " >Phylosophy</sl-button>\n        <sl-button class=\"anim-in1\" @click=", " >Biography</sl-button>\n       <div>\n       \n        <p>&nbsp;</p>\n        <h2 class=\"library\"> Library </h2>\n        <span class=\"divider\"></span>\n        \n        \n        <div class=\"books-grid\">\n            ", "\n        </div>\n\n        \n      </div>\n\n      \n     \n    "]);
-
-  _templateObject = function _templateObject() {
-    return data;
-  };
-
-  return data;
-}
 
 function _taggedTemplateLiteral(strings, raw) { if (!raw) { raw = strings.slice(0); } return Object.freeze(Object.defineProperties(strings, { raw: { value: Object.freeze(raw) } })); }
 
@@ -7940,13 +8588,13 @@ class HomeView {
 
     _Utils.default.pageIntroAnim();
 
-    this.getBooks();
+    this.getArtworks();
   }
 
-  async getBooks() {
+  async getArtworks() {
     try {
-      this.books = await _BookAPI.default.getBooks();
-      console.log(this.books);
+      this.artworks = await _ArtworkAPI.default.getArtworks();
+      console.log(this.artworks);
       this.render();
     } catch (err) {
       _Toast.default.show(err, 'error');
@@ -7954,7 +8602,7 @@ class HomeView {
   }
 
   render() {
-    const template = (0, _litHtml.html)(_templateObject(), JSON.stringify(_Auth.default.currentUser), _Auth.default.currentUser.firstName, () => (0, _Router.gotoRoute)('/books'), () => (0, _Router.gotoRoute)('/books'), () => (0, _Router.gotoRoute)('/books'), () => (0, _Router.gotoRoute)('/books'), () => (0, _Router.gotoRoute)('/books'), () => (0, _Router.gotoRoute)('/books#g'), () => (0, _Router.gotoRoute)('/books'), () => (0, _Router.gotoRoute)('/books'), () => (0, _Router.gotoRoute)('/books'), () => (0, _Router.gotoRoute)('/books'), this.books == null ? (0, _litHtml.html)(_templateObject2()) : (0, _litHtml.html)(_templateObject3(), this.books.map(book => (0, _litHtml.html)(_templateObject4(), book._id, book.name, book.author, book.genre, book.description, book.summary, book.image))));
+    const template = (0, _litHtml.html)(_templateObject || (_templateObject = _taggedTemplateLiteral(["\n      <va-app-header title=\"Home\" user=", "></va-app-header>\n      \n      <div class=\"page-content\">\n      \n\n      <section class=\"sec1\">\n       \n       <div class=\"secone\">\n       <h1 style=\"color:white\">Welcome,</h1>\n       <h1 style=\"color:white\">", "!</h1><br>\n       <p>Discover, Collect, Sell and <br> Buy creative artworks</p>\n       <sl-button size=\"medium\" @click=", " >Let's get started</sl-button>\n       <p>&nbsp;</p>\n     </div>\n     <img src=\"/images/8.png\" width=\"100%\" height=\"\"/>\n   </section> \n        <div class=\"header calign \" >  \n        \n        \n\n\n\n\n<svg xmlns=\"http://www.w3.org/2000/svg\" id=\"verapc\" width=\"1920\" baseProfile=\"tiny\" class=\"svgmate\" preserveAspectRatio=\"xMaxYMin meet\" version=\"1\" viewBox=\"0 0 1920 1080\"><style>@keyframes plantone{0%,to{transform:scaleY(1) rotate(0deg)}50%{transform:scaleY(1.02) rotate(1deg)}}@keyframes steam{0%{transform:scaleY(1.02);opacity:0}50%{opacity:.5}to{transform:scaleY(1);opacity:0}}@keyframes head{0%,to{transform:rotate(0deg)}85%{transform:rotate(3deg)}}@keyframes shapemask{0%{transform:scaleX(1) scaleY(1) rotate(0deg)}25%{transform:scaleX(1.03) rotate(0deg)}50%{transform:scaleY(1.03) rotate(0deg)}}@keyframes sleave{0%,to{transform:rotate(0deg)}85%{transform:rotate(3deg)}}@keyframes arm{0%,to{transform:translateX(0) rotate(0deg)}85%{transform:translateX(-15px) rotate(0deg)}}@keyframes armright{0%,10%,80%,to{transform:rotate(0deg)}40%,50%{transform:rotate(-4deg)}}@keyframes veraslidein{0%{transform:translateX(1200px)}50%{transform:translateX(0)}75%{transform:translateX(50px)}90%{transform:translateX(42px)}to{transform:translateX(45px)}}@keyframes verascalein{0%,15%{transform:scale(0)}50%{transform:scale(1.1)}75%{transform:scale(.98)}90%{transform:scale(1.01)}to{transform:scale(1)}}@keyframes veradropin{0%{transform:translateY(-1200px)}50%{transform:translateY(45px)}75%{transform:translateY(-5px)}90%{transform:translateY(3px)}to{transform:translateY(0)}}#verapc.svgmate .plant{animation-name:plantone;transform-origin:1907.25px 884.25px;transition:all .5s}#verapc.svgmate .plant:hover{opacity:.5}#verapc.svgmate .arm,#verapc.svgmate .plant,#verapc.svgmate .steam{animation-timing-function:ease-in-out;animation-iteration-count:infinite}#verapc.svgmate .steam{transition:all .5s;animation-name:steam}#verapc.svgmate .arm{animation-name:arm;animation-duration:5s;transform-origin:1009.149px 711.625px}</style><g id=\"L1_x5F_RoomWalls\"><path fill=\"#F3726C\" d=\"M895 0v737l-660 343H0V0z\"/><path fill=\"#FEEBE8\" d=\"M1920 0v737H895V0z\"/><path fill=\"#F8AFA3\" d=\"M1920 737H895l-660 343h1685z\"/></g><g id=\"_L3_x5F_Frame-Plant-STable\"><g id=\"_x3C_Group_x5F_FRAME_x3E_\" class=\"framedropin\" style=\"animation-name:veradropin;animation-iteration-count:1;animation-duration:.9s;animation-timing-function:ease-in-out\"><path fill=\"#FAC2BA\" d=\"M1489 539c0 4-3 7-7 7h-213c-4 0-7-3-7-7V406c0-4 3-7 7-7h213c4 0 7 3 7 7v133z\"/><path fill=\"#FBCFC9\" d=\"M1481 532c0 4-3 7-6 7h-199c-4 0-7-3-7-7V413c0-4 3-6 7-6h199c3 0 6 2 6 6v119z\"/><path fill=\"#FDDCD7\" d=\"M1481 464v32h-130v-25s68-10 130-7z\"/><g id=\"_x3C_Group_x5F_TREE_x5F_Ani_x3E_\" fill=\"#FFF\"><path d=\"M1446 494l-2-10c0-4 3-17 2-27-1-9 9-28 9-14s-1 29 0 34 5 13 5 17h-14zM1464 494v-25c1-5 3-3 4 3l5 22h-9z\"/></g><path fill=\"#F7A09E\" d=\"M1481 491v41c0 4-3 7-6 7h-199c-4 0-7-3-7-7v-74s14-5 33-4c50 3 32 30 145 37h34z\"/><path fill=\"#F9B4B0\" d=\"M1304 454c6 3 23 13 23 21 0 13-18 21-18 38 0 12 47 26 47 26h-32s-16-9-27-20c-10-10 3-19 11-27 5-6 12-11 12-17 0-7-27-21-27-21h11z\"/></g><g id=\"_x3C_Group_x5F_STable_x3E_\" class=\"tabledropin\" style=\"animation-name:veradropin;animation-iteration-count:1;animation-duration:1s;animation-timing-function:ease-in-out\"><path fill=\"#17354C\" d=\"M942 727l-6 53c-1 5-4 6-4-1l1-52h9zM1027 727l6 53c2 5 5 6 5-1l-2-52h-9z\"/><path fill=\"#F58F8B\" d=\"M1085 618c0-9-7-16-16-16l-147-6c-31 2-89 23-89 23l252-1z\"/><path fill=\"#F4827F\" d=\"M991 618l78-16c9 0 16 7 16 16v108c0 9-7 16-16 16l-62 16c-9 0-16-7-16-16V618\"/><path fill=\"#F7A09E\" d=\"M1020 742c0 9-7 16-16 16H839c-9 0-16-7-16-16V634c0-9 7-16 16-16h165c9 0 16 7 16 16v108z\"/><path fill=\"none\" stroke=\"#F4827F\" stroke-miterlimit=\"10\" stroke-width=\"4\" d=\"M823 686h197\"/><path fill=\"#FEEBE8\" d=\"M903 660l-7-1c-3-1-3-4-2-6 2-2 3 0 4 1l5 1h37l5-1c1-1 2-3 4-1 1 2 1 5-1 6l-8 1h-37zM903 725c-2 0-5 0-7-2-3-1-3-4-2-5 2-2 3-1 4 1h47c1-2 2-3 4-1 1 1 1 4-1 5-3 2-6 1-8 1h-37z\"/><path fill=\"#17354C\" d=\"M879 758l-6 52c-1 6-4 6-4-1l1-51h9zM964 758l6 52c2 6 5 6 5-1l-2-51h-9z\"/></g><g id=\"L4_x5F_PPlant\" class=\"plantdropin\" style=\"animation-name:veradropin;animation-iteration-count:1;animation-duration:1.3s;animation-timing-function:ease-in-out\"><ellipse cx=\"898\" cy=\"573\" fill=\"#D9D4D3\" rx=\"29\" ry=\"4\"/><g id=\"_x3C_Group_x5F_PPlant_x3E_\"><path fill=\"#17354C\" d=\"M898 579s0-13 6-21c5-8 16-7 21-6s22 6 30 5 13-5 21-4c16 1 23 5 32 6s20-5 10-14c-6-6-12-5-30-11s-27-5-37-5c-11 0-48-2-55 50h2z\"/><path fill=\"#4F6F83\" d=\"M893 580l-21-20c-3-2-9 1-12 1-4 0-8 0-16-8-4-6-10-16-13-18-12-10-16-16-18-18-2-4-3-7 3-3s7 8 19 11c11 3 12 10 27 15 13 5 9 14 10 16 1 4 24 23 24 23l-3 1z\"/><path fill=\"#4F6F83\" d=\"M885 579v-12c0-4-6-1-18-27-6-14-1-24-2-38l-5-35c0-7 2-10 5-4 8 15 14 15 15 29 1 13 6 23 11 46 5 24-4 22-4 30v11h-2z\"/><path fill=\"#17354C\" d=\"M862 463l2 4 4 11a119 119 0 0 1 5 16l1 5a250 250 0 0 0 4 23 323 323 0 0 1 8 37v0a247 247 0 0 0-8-27l-2-9a121 121 0 0 1-5-29 71 71 0 0 0-4-15l-3-12-2-4z\"/><path fill=\"#4F6F83\" d=\"M903 579v-18c1-7 11-12 14-32 4-24-9-63-12-74l-5-26c-2-5-3-14-8 2s-4 33 0 47c10 39-12 37 6 70l3 9v22h2z\"/><path fill=\"#17354C\" d=\"M890 579s2-29 6-35 12-2 20-26 5-59 4-63-2-13-8-3-17 31-18 45-5 13-5 24c-1 12 6 14 5 24l-6 34h2z\"/></g><path fill=\"#FFF\" d=\"M898 577c-16 0-29-2-29-4v17c0 11 13 21 29 21s28-10 28-21v-17c0 2-12 4-28 4z\"/><path id=\"_x3C_Path_x5F_TopLeave_x3E_\" fill=\"#17354C\" d=\"M890 577c-1-3-4-6-9-6-3 0-5 2-5 4s0 12-8 12-14 11-17 13l-13 7-9 5c-5 3-8 6-6-1s8-15 12-17c4-3 7-10 9-12s6-10 17-10h13l7-2c3 0 8 1 10 7h-1z\"/></g></g><path id=\"Layer_13\" fill=\"#FFF\" d=\"M126 1080c120-147 255-180 420-327 92-82 222-432 510-522s708 165 864 171 3-432 3-432L-23-28l-16 1109 165-1z\" class=\"shapecut\" style=\"animation-name:shapemask;animation-timing-function:ease-in-out;animation-iteration-count:infinite;animation-duration:5s\"/><g class=\"plantsscalein\" style=\"animation-name:verascalein;animation-iteration-count:1;animation-duration:1.5s;animation-timing-function:ease-in-out;transform-origin:1907.25px 884.25px\"><path fill=\"#17354C\" d=\"M1920 570s-10-70-24-100-66-107-75-124c-9-18-18-15-13 14 6 28 34 88 40 107 6 20 32 80 32 133 1 42 16 87 22 121 9 46-5 54-1 94 1 15 4 35 7 43h12V570z\" class=\"plant p1\" style=\"animation-duration:4s\"/><path fill=\"#355469\" d=\"M1891 858s-6-28-8-52c-2-23-6-61-31-94-15-19-14-56-15-74 0-32-19-55-26-71s-10-32-12-40-6-27-14 10 4 87 17 112c18 38-3 91 20 135 13 23 30 30 41 32s14 3 17 13l8 29h3z\" class=\"plant p2\" style=\"animation-duration:8s\"/><path fill=\"#2A475D\" d=\"M1852 850s-49-48-57-70c-13-35-35-79-85-147-24-32-70-38-85-45-19-9-38-24-43-30-4-6-23-23-3 19 16 35 62 46 83 64 47 40 30 73 62 115 13 17 27 29 53 34 11 2 20 6 29 16 16 16 16 16 37 44h9z\" class=\"plant p3\" style=\"animation-duration:3.6s\"/><path fill=\"#17354C\" d=\"M1883 858s-4-50-82-155-106-145-115-153-26-21-13 17c15 47 3 63 23 88l69 90c36 46 78 79 93 80 6 0 9 5 11 8 5 9 10 25 10 25h4z\" class=\"plant p4\" style=\"animation-duration:4.8s\"/><path fill=\"#17354C\" d=\"M1852 850s-49-48-57-70c-13-35-82-82-97-91-37-23-55-46-60-52-12-15-31-37-22 16 6 34 40 70 62 88 47 40 73 44 99 49 11 2 20 6 29 16 16 16 16 16 37 44h9z\" class=\"plant p5\" style=\"animation-duration:5.6s\"/></g><path id=\"L2_x5F_Table-Carpet\" fill=\"#F69186\" d=\"M453 1080s10-56 100-42c73 11 85 2 106-11 34-21 148-48 345 53H453z\"/><g class=\"peopletableslide\" style=\"animation-name:veraslidein;animation-iteration-count:1;animation-duration:1s;animation-timing-function:ease-in-out;transform:translateX(45px)\"><path fill=\"#F3726C\" d=\"M1920 846l-285-16c-60-3-255-17-429 117l-174 133h888V846z\"/><g id=\"L4Cup_x5F_CupShadow\"><path id=\"_x3C_Path_x5F_CupShadow_x5F_L4Cup_x3E_\" fill=\"#F1635E\" d=\"M1174 972h137l-15-24-81-8-9 7c-12 8-22 17-32 25z\"/></g><g id=\"L5_x5F_Human_x5F_Woman\"><path id=\"_x3C_Path_x5F_WArm_x5F_back_x3E_\" fill=\"#F68E5A\" d=\"M1532 830s-10-81-32-113l-28 29 38 84h22z\"/><g id=\"_x3C_Group_x5F_WShirt_x3E_\"><path id=\"_x3C_Path_x5F_Shirt_x5F_middle_x3E__1_\" fill=\"#355469\" d=\"M1228 694s38-53 137-61c0 0 66-4 105 29l48 43s4 5-2 13c-3 4-8 3-10 6-6 6-3 9-10 16-4 3-8 1-12 10l-30 57c-9 17-17 25-38 26s-61 12-79 18c-21 6-91-7-95-45l-14-112z\"/><path id=\"_x3C_Path_x5F_Shirt_x5F_top_x3E_\" fill=\"#17354C\" d=\"M1234 739l-6-45s38-53 137-61c0 0 66-4 105 29l40 35s-1 7-10 8-14-6-18-2c-5 4 9 15 0 22s-19-7-28-2 0 12-10 19c-8 6-27-14-35-9s-2 22-12 25c-7 3-25-17-32-15s-1 27-12 28-12-22-25-22-12 21-23 18c-10-4-2-30-13-34-8-3-15 18-23 17s-1-22-9-24-26 13-26 13z\"/><path id=\"_x3C_Group_x5F_Shirt_x5F_bottom_x3E_\" fill=\"#2A475D\" d=\"M1489 833l-30-36-5 9c-9 18-17 26-38 27s-61 12-79 18c-10 3-31 1-51-5l-1 50c71-38 143-55 203-63h1z\"/></g><g id=\"_x3C_Group_x5F_Face_x5F_Woman_x3E_\"><path id=\"_x3C_Path_x5F_WNeck_x3E_\" fill=\"#F68E5A\" d=\"M1327 630s-5 6-1 13c4 8 31 55 32 59 1 3 6 13 10 4s11-58 11-58-18 15-52-18z\"/><path id=\"_x3C_Path_x5F_WFace_x5F_Shape_x3E_\" fill=\"#F89F71\" d=\"M1313 606s18 47 54 47c26 0 38-32 38-50v-37h-92v40z\"/><path id=\"_x3C_Path_x5F_WHair_x3E_\" fill=\"#FDFEFF\" d=\"M1356 511c-17-1-32 8-44 23-8 10-26 4-25 38 1 10 4 6 4 15-1 9-7 12-7 21s5 40 28 35c20-5 16-17 16-21s-1-6-6-10-5-8-3-10 5-1 7 1 4 4 5-3-4-19 4-16 17 11 40 10 29-13 30-16v27l-2 15s9-1 22-19c7-9 3-17 1-23 0 0-15-25-15-32s-15-31-55-35z\"/><g id=\"_x3C_Group_x5F_WEyes_x3E_\" fill=\"#2C5169\"><path d=\"M1390 610h7c3 0 4-2 2-3-4-3-9 3-9 3zM1356 612h9c3 0 4-2 3-3-5-3-12 3-12 3z\"/></g><path id=\"_x3C_Path_x5F_WNose_x3E_\" fill=\"#F68D59\" d=\"M1383 609c0 2 3 21-4 21s-6-9-3-15 6-13 7-6z\"/><path id=\"_x3C_Path_x5F_WMouth_x3E_\" fill=\"#F5845F\" d=\"M1373 643c4 0 7-2 8-3s-3-2-8-2-10-1-7 2c2 2 5 3 7 3z\"/></g><path fill=\"#F1625D\" d=\"M1507 874h-2c-7-3-23-11-41-37-35 6-74 15-113 30l156 7z\"/><g class=\"specrotate\" style=\"animation-name:armright;animation-timing-function:ease-in-out;animation-iteration-count:infinite;animation-duration:7.5s;animation-delay:2s;transform-origin:1519px 874.7px\"><g id=\"_x3C_Group_x5F_WGlasses_x3E_\"><path fill=\"#F9B4A7\" d=\"M1346 726h-1c0-1-19-39-23-44l-2-2c-3 0-6 2-8 3h-1v-1c1-1 5-4 9-4l4 3 23 44a1 1 0 0 1-1 1zM1398 702h-1a1362 1362 0 0 0-26-48c-3 0-6 2-7 3h-2v-1c1-1 5-4 9-4l4 3a1300 1300 0 0 1 23 47z\"/><path fill=\"#F9B4A7\" d=\"M1398 703h2v2c-3 4-10 8-16 8h-1l-3-1c0-1 2-4 6-6l12-3m0-2c-4 0-9 1-12 3-8 3-12 10-3 11h1c8 0 20-8 18-12-1-2-2-2-4-2zM1364 719h2v2c-3 4-10 8-16 8h-1l-3-1c0-1 2-4 6-6l12-3m0-2c-4 0-9 1-12 3-8 3-12 10-3 11h1c8 0 20-8 18-12-1-2-2-2-4-2z\"/><path fill=\"#F9B4A7\" d=\"M1368 719l-2-1c4-5 9-6 13-6v2c-3 0-8 1-11 5z\"/></g><path id=\"_x3C_Path_x5F_WArm_x3E__1_\" fill=\"#F89F71\" d=\"M1393 649c-8 1-18 1-24 10s-10 21-5 22c7 1 5-7 8-9 3-3 15-10 11-2-2 4-2 7-2 9s3 3 5-2c3-6 9-6 13-6s8 0 11 10 19 83 33 116c25 59 52 73 62 77 19 6 25-8 25-8s12-35-19-79c-24-34-40-68-58-89s-23-29-27-34-13-16-33-15z\"/></g></g><g id=\"L5_x5F_Human_x5F_Man\"><path id=\"sholderforman\" fill=\"#FFF5F3\" d=\"M1163 622c58 28 85 38 82 193s-26 123-42 114-40-307-40-307z\"/><path fill=\"#FDE6E1\" d=\"M1175 682l10 12c1-2-1-16-5-16s-5 4-5 4z\"/><path fill=\"#F68F5B\" d=\"M1161 617l-8 13c-1 3-5 5 2 16s6 12 6 12h-61s-5-29-5-49c0-8 19-38 22-42 0 0 21 48 44 50z\"/><path fill=\"#17354C\" d=\"M1114 650s15 6 23 5 20-17 20-17 17 36 27 83 16 96 0 242l-93 73 23-386z\"/><path fill=\"#FBCFC9\" d=\"M1089 609s-57 35-91 48c-27 11-62 56-90 141s-42 216-42 282h166l77-59s4-75 15-134 15-122 21-146 9-32 7-43c-1-11-48-57-53-64-5-8-10-25-10-25zM1158 618s41 8 56 102-10 120 6 216l-38 28 1-36c0-19 10-66 8-111-2-38-8-126-38-177l5-22z\"/><path fill=\"#FFF\" d=\"M1122 707c-5-9-8-29-24-49s-26-34-22-42 12-12 22-16c-3 7-5 13-2 20 8 18 29 41 49 61 14 14 6 34 6 34 0-14-3-36-15-15-4 7-5 25-14 7z\"/><path fill=\"#FFF5F3\" d=\"M1156 624l-4 8c-1 1-3 4 2 12s15 28 21 55c0-9 0-20 3-21s7 6 8 16c2-1 2-9-6-26l-24-44z\"/><path id=\"_x3C_Path_x5F_ArmShadow_x3E_\" fill=\"#F1635E\" d=\"M1065 1055l150 5c16 1 38-4 48-3h30l-17-14-183-10-28 22z\"/><g id=\"_x3C_Group_x5F_Mouse_x3E_\" class=\"arm\"><path fill=\"#FBCFC9\" d=\"M1363 1051c-6 6-17 11-36 10s-54 1-46-17 16-18 59-15c13 0 41 4 23 22z\"/><path fill=\"#F3726C\" d=\"M1353 1037c-11-7-24-5-14 0s24 6 14 0z\"/></g><g id=\"_x3C_Group_x5F_ManSleeve_x3E_\" class=\"sleave\" style=\"animation-name:sleave;animation-timing-function:ease-in-out;animation-iteration-count:infinite;animation-duration:5s;transform-origin:1009.149px 711.625px\"><path id=\"_x3C_Path_x5F_WhiteSleeve_x3E_\" fill=\"#FFF5F3\" d=\"M1084 712c-9-22-26-58-65-58s-97 56-97 183 1 211 45 213c7 0 14-9 26-17 25-19 60-40 64-47 6-10 7-36 6-56s6-107 18-136 13-60 3-82z\"/><path id=\"_x3C_Path_x5F_WhiteSleeve_x5F_Shadow_x3E_\" fill=\"#FBCFC9\" d=\"M994 1023s-21 18-31 18-13-10-13-17c2-20 46-76 113-78 0 0-36 49-69 77z\"/></g><g id=\"_x3C_Group_x5F_ManArm_x3E_\" class=\"arm\"><path fill=\"#F89F71\" d=\"M1347 1034l-15-20c-3-5-8-10-25-6s-37 10-51 5-172-62-186-64-30-4-62 13-54 36-40 47 41 23 97 26 155 12 175 13 22-3 30-2l11 2c5 0 17-14 25-14s14 6 18 9 8 3 4-2-10-11 3-1c2 2 5 4 11 3s18 1 5-9z\"/><path fill=\"#F79463\" d=\"M1024 954l-16 8c-32 18-54 36-40 47s41 23 97 26 155 12 175 13c0 0-23-22-66-22s-84-13-104-22-35-18-46-50z\"/></g><g class=\"armright\" style=\"animation-name:armright;animation-timing-function:ease-in-out;animation-iteration-count:infinite;animation-duration:10s;transform-origin:1243px 961.5px\"><path id=\"_x3C_Path_x5F_ArmRight_x3E_\" fill=\"#F89F71\" d=\"M1267 686c-5 22-106 264-24 276 54 7 58-146 53-260-1-15-1-18 4-29s11-26 4-38-11-17-16-21-7-7-13 10c-2-5-8-14-15-17-5-3-4 4-1 7s5 12 5 24 0 25 3 30 2 8 0 18z\"/><path id=\"_x3C_Path_x5F_HandShadow_x3E_\" fill=\"#F68F5B\" d=\"M1303 660s-4 5-11 5-20-6-21-21c0-6 2-11 3-10s5 16 9 19 6 0 9 3 4 5 11 4z\"/><g id=\"_x3C_Group_x5F_Pencil_x5F_Front_x3E_\"><path fill=\"#F9B4A7\" d=\"M1344 683c-5-12-28-25-37-32l-2 8c6 4 29 23 39 24z\"/><path fill=\"#FEEEE8\" d=\"M1344 683l-9-11-5 5c5 3 10 6 14 6z\"/><path fill=\"#F26D57\" d=\"M1344 683l-3-4-2 3 5 1z\"/></g><g id=\"_x3C_Group_x5F_Pencil_x5F_Back_x3E_\"><path fill=\"#F26D57\" d=\"M1246 610c1-2 2-1 3-1l-7-5h-4c-2 1-1 4 0 5l7 4 1-3z\"/><path fill=\"#F9B4A7\" d=\"M1274 627l-24-18s-3-1-4 1v4l27 19 1-6z\"/></g></g><g id=\"_x3C_Group_x5F_Man_x5F_Face_x3E_\" class=\"manhead\" style=\"animation-name:head;animation-timing-function:ease-in-out;transform-origin:1117.293px 580.5px;animation-iteration-count:infinite;animation-duration:5s\"><path fill=\"#F89F71\" d=\"M1212 508c14 8 27 26 8 72s-45 63-77 28-33-55-8-89c24-34 47-29 77-11z\"/><path id=\"_x3C_Path_x5F_Snor_x3E_\" fill=\"#FFF\" d=\"M1215 603c2-2 3-7-2-10s-8 1-11 4-7 4-10 4-8 3-1 4 20 4 24-2z\"/><path fill=\"#FFF\" d=\"M1175 557c0-12 10-16 5-23s-9-14-12-16-6-10 6-10 36 14 47 11 20-10 3-20-52-35-91-24c-12 4-16 12-17 15s-11 0-15 9-15 51-4 76c4 11 6 18 22 17 11-2 12 5 29-14 6-6 7-11 10-17 2-5 17-4 17-4z\"/><path id=\"_x3C_Path_x5F_Nose_x3E_\" fill=\"#F68E5A\" d=\"M1219 569s-11 10-11 18 9 8 11 1 2-14 0-19z\"/><g id=\"_x3C_Group_x5F_Glasses_x3E_\"><path fill=\"#F26A56\" d=\"M1209 551c-7 0-14 10-14 18s5 11 8 11 14-3 14-18c0-4-1-11-8-11zm-5 25c-3 0-5-1-5-7 0-9 6-14 10-14 2 0 5 0 5 7 0 8-7 14-10 14z\"/><path fill=\"#F26D57\" d=\"M1231 558c-3 0-7 3-11 9s-2 15 2 17c5 2 15-5 15-19 0-4-2-7-6-7zm-6 23c-2 0-3-3-3-5 0-7 6-14 9-14 1 0 2 1 2 4 0 7-5 15-8 15z\"/><path fill=\"#F26A56\" d=\"M1156 561l3-5c2-3 6-1 8-1l30 9v4l-28-9c-2-1-6-2-8 0l-3 4c-1 2-3 0-2-2zM1216 568h5l-1 3h-5z\"/></g><path id=\"_x3C_Path_x5F_Beard-TOP_x3E_\" fill=\"#FFF\" d=\"M1166 602c-4 0-9 0-12 5s-6 11 5 16 13 9 17 15 13 13 22-2 10-24 8-27c0 0-4 4-12 5-9 1-20-11-28-12z\"/></g></g></g><g class=\"stuffontable\"><g id=\"L4_x5F_ScreenLamp\" class=\"screenlamp\" style=\"animation-name:veraslidein;animation-iteration-count:1;animation-duration:1.39s;animation-timing-function:ease-in-out;transform:translateX(45px)\"><path fill=\"#F4827F\" d=\"M1823 958l41-366-187-272 3-9 194 281-41 366z\"/><path fill=\"#F8AFA3\" d=\"M1681 464c-2 3-24 2-61-11-32-11-57-26-55-31 2-4 32-1 63 11 34 12 55 26 53 31z\"/><ellipse cx=\"1868\" cy=\"596\" fill=\"#FFF\" rx=\"9\" ry=\"9\"/><ellipse cx=\"1868\" cy=\"596\" fill=\"#F15E59\" rx=\"4\" ry=\"4\"/><path fill=\"#F58D88\" d=\"M1628 433l-8 20c37 13 59 14 61 11 2-5-19-19-53-31\"/><path fill=\"#FEEBE8\" d=\"M1618 430s-2 10 3 14 9 4 17-7c0 0-7-5-20-7z\"/><path fill=\"#FAC2BA\" d=\"M1680 344c-4-9 1-32 8-45 4-7 0-14-7-17-9-4-16 0-20 10s-6 31-25 41c-19 11-38 21-52 48s-19 42-19 42c2-5 32-2 63 10 34 12 55 26 53 31 0 0 10-33 11-48s4-25-12-72z\"/><path fill=\"#FBCFC9\" d=\"M1621 430l7 3c33 12 55 26 53 31 0 0 10-33 11-48s4-25-12-72c-4-9 1-32 8-45 4-7 0-14-7-17-9-4-16 0-20 10l-4 13s4 24 2 32c-4 14-28 10-36 56-3 14-2 37-2 37z\"/><g id=\"_x3C_Group_x5F_SCREEN_x3E_\"><path fill=\"#FFF\" d=\"M1715 939c-5-5-41-60-47-70s-3-18-2-25l36-253c2-10 3-10 12-12 24-1 67 3 67 3 5 2 10 4 10 13-2 37-7 112-14 162a1897 1897 0 0 1-34 165c-6 22-8 24-15 26-4 2-10-5-13-9z\"/><path fill=\"#FEE6DF\" d=\"M1820 955l-42-149-16 67-19 60c-5 16-11 15-15 15 7-2 9-4 15-26 10-37 23-104 30-144 9-48 15-141 18-183 0-8-5-11-10-13 7 0 14 3 14 20 1 37-4 110-12 167l50 186h-13z\"/><path fill=\"#FBCFC9\" d=\"M1778 600l-71-8-30 215 61 71s15-66 24-121c16-89 16-157 16-157z\"/><path fill=\"#F0504A\" d=\"M1931 1000c0 12-43 32-104 32-43 0-118-18-118-40 0-17 51-39 116-39 35 0 106 32 106 47z\"/><path fill=\"#F4827F\" d=\"M1706 607l2-15 71 8-1 18-72-11z\"/><path fill=\"#FAC1B8\" d=\"M1684 760l8-59 74 34a1035 1035 0 0 1-14 78l-68-53zM1696 679l7-53 74 17-6 62-75-26z\"/><path fill=\"#FDE6E3\" d=\"M1701 719l18 9-5 39-19-12zM1731 733l18 9-8 45-17-13zM1740 648l20 4-5 34-19-5zM1709 640l21 5-5 33-19-6z\"/><ellipse cx=\"1713\" cy=\"601\" fill=\"#FEF5F5\" rx=\"1\" ry=\"3\"/><ellipse cx=\"1717\" cy=\"602\" fill=\"#FEF5F5\" rx=\"1\" ry=\"3\"/><path fill=\"#FBCFC9\" d=\"M1702 860c0 3-1 5-3 6-1 0-2-2-2-5s2-5 3-5c2-1 3 1 2 4z\"/><path fill=\"#FDDFDB\" d=\"M1851 963c0 5-10 9-23 9s-23-8-23-13c0-6 10-10 23-10s23 8 23 14z\"/></g></g><g id=\"L4_x5F_Keyboard\" class=\"keyboard\" style=\"animation-name:veraslidein;animation-iteration-count:1;animation-duration:1.37s;animation-timing-function:ease-in-out;transform:translateX(45px)\"><path fill=\"#FFF\" d=\"M1574 913c6 0 13-1 20 11l43 85c4 7 5 13-7 17s-91 15-98 17-18 1-23-14-22-95-23-103 1-13 17-13h71z\"/><path fill=\"#FDDFDB\" d=\"M1511 1020a3001 3001 0 0 1-24-103c-2 2-2 5-2 9 2 8 19 87 24 103s16 15 23 14 86-13 98-17c6-2 9-5 9-8-12 4-98 15-105 16s-19 2-23-14z\"/><path fill=\"#FBCFC9\" d=\"M1560 922c4 0 8 0 13 7l30 66c3 4 1 11-7 13l-61 9c-5 0-12 1-15-10l-19-77c-2-8-2-9 13-9l46 1z\"/><path fill=\"#F1625D\" d=\"M1509 1029a3001 3001 0 0 1-24-110c-16 0-18 5-17 13 2 7 9 78 14 93 4 15 15 18 30 18l7-1c-4-2-8-6-10-13z\"/></g><g id=\"L4_x5F_Cup\" class=\"coffee\" style=\"animation-name:veraslidein;animation-iteration-count:1;animation-duration:1.3s;animation-timing-function:ease-in-out;transform:translateX(45px)\"><path fill=\"#FBD0C9\" d=\"M1339 900l-6-2 2-21h-54c0 1 9 64 17 84 3 8 6 11 13 11s10-4 12-11l3-15c9 0 10-3 11-6l7-28c2-10-3-11-5-12zm1 9l-7 30c-1 2-4 2-6 2l6-39 4 1c4 2 3 4 3 6z\"/><ellipse cx=\"1308\" cy=\"877\" fill=\"#F3726C\" rx=\"27\" ry=\"10\"/><path fill=\"#2A475D\" d=\"M1330 883c-5 2-13 4-22 4-8 0-15-1-20-3-4-2 5-6 20-6s25 3 22 5z\"/><g id=\"_x3C_Group_x5F_Cup_x5F_Steam_x3E_\"><path fill=\"#FFF5F3\" d=\"M1308 862c2 0 9-5 9-16s-1-19-6-26-8-21-9-9c0 8 3 10 3 16-1 5-6 16-6 22s3 13 9 13z\" class=\"steam ste1\" style=\"animation-duration:4s\"/><path fill=\"#FFF5F3\" d=\"M1326 851c1 3-2 12-5 8-2-2 2-5 1-8-2-7 0-13 4 0z\" class=\"steam ste2\" style=\"animation-duration:4.8s\"/></g></g><g id=\"L_x3F__x5F_PencilBox_x5F_TopLayer\" class=\"pencils\" style=\"animation-name:veraslidein;animation-iteration-count:1;animation-duration:1.3s;animation-timing-function:ease-in-out;transform:translateX(45px)\"><path fill=\"#FFF\" d=\"M1657 1080s-6-53-4-72h120c0 38-4 72-4 72h-112z\"/><ellipse cx=\"1713\" cy=\"1008\" fill=\"#FBCFC9\" rx=\"60\" ry=\"22\"/><g id=\"_x3C_Group_x5F_PencilPink_x3E_\"><path fill=\"#F8AFA3\" d=\"M1671 932s-6-1-8 3l-4-13c2-4 8-3 8-3l4 13\"/><path fill=\"#FDDFDB\" d=\"M1702 1029l-31-97s-6-1-8 3l30 93 9 1z\"/></g><g id=\"_x3C_Group_x5F_PencilBlue_x3E_\"><g fill=\"#17354C\"><path d=\"M1696 930v-1M1683 916c5-6 9 0 9 0l4 13c-1 0-6-2-10 1l-3-14z\"/></g><path fill=\"#F8AFA3\" d=\"M1719 1029l-23-99s-6-3-10 0l22 99h11z\"/></g></g></g></svg>\n\n\n\n\n\n\n\n\n        \n\n      \n\n        \n        <h2 class=\"quote\" > \u201CIt is not the language of painters but the language of nature which one should listen to, the\nfeeling for the things themselves, for reality, is more important than the feeling for pictures.\u201D <span> \u2013 Vincent Van Gogh  </span></h2>\n    \n        \n        </div>\n       \n        \n        <p>&nbsp;</p>\n\n        <h1 class=\"explore\"> Explore </h1>\n      \n        \n        \n        <div class= \"filter-menu\">\n\n        <sl-button  @click=", " >Filter</sl-button>\n\n  </div>\n       \n\n        \n        \n        <div class=\"artworks-grid\">\n            ", "\n        </div>\n\n     \n      \n\n      \n\n      <footer>\n    \n    <div class=\"copyright\"> <p> Copyright &copy;<script>document.write(new Date().getFullYear());</script> Designed &amp; Developed by Roann Mamedy, Heemesh, Yashna | All rights reserved </p></div>\n    <div class=\"inner_footer\">\n      <!-- Logo for footer -->\n      <div class=\"logo_container\">\n  <img src=\"images/logoblack.png\">\n      </div>\n      <!-- about us -->\n      <div class=\"footer_third\">\n    <h6 class=\"minititle\">About Us</h6> <br>\n    <h7 class=\"minitext\">Creative artworks provides with the<br><br>\n      selling and buying of artworks in Mauritius\n    </h7>\n  </div>\n     \n      \n      <!-- website sections links -->\n      <h6 class=\"minititle\">Navigation</h6>\n      <h7 class=\"minititle\">\n<a href=\"#\">Home</a></li><br>\n<a href=\"#\">Sell</a></li><br>\n<a href=\"#\">Cart</a></li><br></h7>\n      \n      </div>\n</footer>\n\n\n\n\n\n\n\n\n\n     \n    "])), JSON.stringify(_Auth.default.currentUser), _Auth.default.currentUser.firstName, () => (0, _Router.gotoRoute)('/guide'), () => (0, _Router.gotoRoute)('/artworks'), this.artworks == null ? (0, _litHtml.html)(_templateObject2 || (_templateObject2 = _taggedTemplateLiteral(["\n                <sl-spinner></sl-spinner>\n            \n            "]))) : (0, _litHtml.html)(_templateObject3 || (_templateObject3 = _taggedTemplateLiteral(["\n              ", "\n            "])), this.artworks.map(artwork => (0, _litHtml.html)(_templateObject4 || (_templateObject4 = _taggedTemplateLiteral([" \n\n              <va-artwork class=\"artwork-card\"\n              id=\"", "\"\n              name=\"", "\"\n              author=\"", "\" \n              genre=\"", "\" \n              price=\"", "\" \n              summary=\"", "\" \n              image=\"", "\">\n             \n              </va-artwork>\n            "])), artwork._id, artwork.name, artwork.author, artwork.genre, artwork.price, artwork.summary, artwork.image))));
     (0, _litHtml.render)(template, _App.default.rootEl);
   }
 
@@ -7963,7 +8611,7 @@ class HomeView {
 var _default = new HomeView();
 
 exports.default = _default;
-},{"./../../App":"App.js","lit-html":"../node_modules/lit-html/lit-html.js","./../../Router":"Router.js","./../../Auth":"Auth.js","./../../Utils":"Utils.js","./books":"views/pages/books.js","./../../BookAPI":"BookAPI.js","./../../Toast":"Toast.js"}],"views/pages/404.js":[function(require,module,exports) {
+},{"./../../App":"App.js","lit-html":"../node_modules/lit-html/lit-html.js","./../../Router":"Router.js","./../../Auth":"Auth.js","./../../Utils":"Utils.js","./artworks":"views/pages/artworks.js","./../../ArtworkAPI":"ArtworkAPI.js","./../../Toast":"Toast.js"}],"views/pages/404.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -7975,17 +8623,9 @@ var _App = _interopRequireDefault(require("./../../App"));
 
 var _litHtml = require("lit-html");
 
+var _templateObject;
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _templateObject() {
-  const data = _taggedTemplateLiteral(["    \n      <div class=\"calign\">\n        <h1>Opps!</h1>\n        <p>Sorry, we couldn't find that.</p>\n      </div>\n    "]);
-
-  _templateObject = function _templateObject() {
-    return data;
-  };
-
-  return data;
-}
 
 function _taggedTemplateLiteral(strings, raw) { if (!raw) { raw = strings.slice(0); } return Object.freeze(Object.defineProperties(strings, { raw: { value: Object.freeze(raw) } })); }
 
@@ -7997,7 +8637,7 @@ class FourOFourView {
   }
 
   render() {
-    const template = (0, _litHtml.html)(_templateObject());
+    const template = (0, _litHtml.html)(_templateObject || (_templateObject = _taggedTemplateLiteral(["    \n      <div class=\"calign\">\n        <h1>Opps!</h1>\n        <p>Sorry, we couldn't find that.</p>\n      </div>\n    "])));
     (0, _litHtml.render)(template, _App.default.rootEl);
   }
 
@@ -8024,17 +8664,9 @@ var _Auth = _interopRequireDefault(require("./../../Auth"));
 
 var _Utils = _interopRequireDefault(require("./../../Utils"));
 
+var _templateObject;
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _templateObject() {
-  const data = _taggedTemplateLiteral(["      \n      <div class=\"page-content page-centered\">\n        <div class=\"signinup-box\">\n          <img class=\"signinup-logo\" src=\"/images/logo.svg\">          \n          <sl-form class=\"form-signup dark-theme\" @sl-submit=", ">          \n            <div class=\"input-group\">\n              <sl-input name=\"email\" type=\"email\" placeholder=\"Email\" required></sl-input>\n            </div>\n            <div class=\"input-group\">\n              <sl-input name=\"password\" type=\"password\" placeholder=\"Password\" required toggle-password></sl-input>\n            </div>\n            <sl-button class=\"submit-btn\" type=\"primary\" submit style=\"width: 100%;\">Sign In</sl-button>\n          </sl-form>\n          <p>No Account? <a href=\"/signup\" @click=", ">Sign Up</a></p>\n        </div>\n        \n       \n      </div>\n    "]);
-
-  _templateObject = function _templateObject() {
-    return data;
-  };
-
-  return data;
-}
 
 function _taggedTemplateLiteral(strings, raw) { if (!raw) { raw = strings.slice(0); } return Object.freeze(Object.defineProperties(strings, { raw: { value: Object.freeze(raw) } })); }
 
@@ -8059,7 +8691,7 @@ class SignInView {
   }
 
   render() {
-    const template = (0, _litHtml.html)(_templateObject(), this.signInSubmitHandler, _Router.anchorRoute);
+    const template = (0, _litHtml.html)(_templateObject || (_templateObject = _taggedTemplateLiteral(["      \n      <div class=\"page-content page-centered\">\n        <div class=\"signinup-box\">       \n         \n        </div>\n      </div>\n\n    <div class=\"form-container sign-in-container\">\n\n      <form action=\"#\">\n        <h1>Sign in</h1>\n\n        <sl-form class=\"form-signup dark-theme\" @sl-submit=", ">\n       <br>\n\n        <div class=\"input-group\">\n        <sl-input name=\"email\" type=\"email\" placeholder=\"Email\"></sl-input>\n        </div>\n\n        <div class=\"input-group\">\n        <sl-input name=\"password\" type=\"password\" placeholder=\"Password\" required toggle-password></sl-input>\n        </div>\n\n\n       <br>\n       <br>\n\n        <sl-button class=\"submit-btn\" type=\"primary\" submit style=\"width: 70%;\">Sign In</sl-button>\n      </sl-form>\n\n    </div>\n\n\n    <div class=\"overlay-container\">\n      <div class=\"overlay\">\n        <div class=\"overlay-panel overlay-left\">\n        </div>\n\n        <div class=\"overlay-panel overlay-right \">\n          \n          <h1>Hey There!</h1>\n          <p>Are you a designer, an artist or just passionate about the creative universe?\n            <br>You're in the right place!\n            <br>This website specialises in the selling and buying of art goodies</p>\n          <h2></h2>\n          <sl-button class=\"ghost\" type=\"primary\" submit style=\"width: 40%;\" @click=", ">Sign Up</sl-button>\n          \n        </div>\n        <img src=\"/images/11.png\" width=\"100%\" height=\"\"/>\n      </div>\n    </div>\n    </div>\n\n    "])), this.signInSubmitHandler, () => (0, _Router.gotoRoute)('/signup'));
     (0, _litHtml.render)(template, _App.default.rootEl);
   }
 
@@ -8086,17 +8718,9 @@ var _Router = require("./../../Router");
 
 var _Utils = _interopRequireDefault(require("./../../Utils"));
 
+var _templateObject;
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _templateObject() {
-  const data = _taggedTemplateLiteral(["      \n      <div class=\"page-content page-centered\">      \n        <div class=\"signinup-box\">\n        <img class=\"signinup-logo\" src=\"/images/logo.svg\">\n          <h1>Sign Up</h1>\n          <sl-form class=\"form-signup\" @sl-submit=", ">\n            <div class=\"input-group\">\n              <sl-input name=\"firstName\" type=\"text\" placeholder=\"First Name\" required></sl-input>\n            </div>\n            <div class=\"input-group\">\n              <sl-input name=\"lastName\" type=\"text\" placeholder=\"Last Name\" required></sl-input>\n            </div>\n            <div class=\"input-group\">\n              <sl-input name=\"email\" type=\"email\" placeholder=\"Email\" required></sl-input>\n            </div>\n            <div class=\"input-group\">\n              <sl-input name=\"password\" type=\"password\" placeholder=\"Password\" required toggle-password></sl-input>\n            </div>     \n            <div class=\"input-group\">\n            <sl-select name=\"accessLevel\" placeholder= \"I am a ...\">\n            <sl-menu-item value=\"1\">Reader</sl-menu-item>\n            <sl-menu-item value=\"2\">Admin</sl-menu-item>\n            </sl-select>\n            </div>     \n            <sl-button type=\"primary\" class=\"submit-btn\" submit style=\"width: 100%;\">Sign Up</sl-button>\n          </sl-form>\n          <p>Have an account? <a href=\"/signin\" @click=", ">Sign In</a></p>\n        </div>\n      </div>\n    "]);
-
-  _templateObject = function _templateObject() {
-    return data;
-  };
-
-  return data;
-}
 
 function _taggedTemplateLiteral(strings, raw) { if (!raw) { raw = strings.slice(0); } return Object.freeze(Object.defineProperties(strings, { raw: { value: Object.freeze(raw) } })); }
 
@@ -8121,7 +8745,7 @@ class SignUpView {
   }
 
   render() {
-    const template = (0, _litHtml.html)(_templateObject(), this.signUpSubmitHandler, _Router.anchorRoute);
+    const template = (0, _litHtml.html)(_templateObject || (_templateObject = _taggedTemplateLiteral(["      \n      <div class=\"page-content page-centered\">      \n        <div class=\"signinup-box\">\n        \n        </div>\n      </div>\n\n\t<div class=\"form-container sign-in-container\">\n\n\t\t<form action=\"#\">\n\t\t\t<h1>Create Account</h1>\n\n      <sl-form class=\"form-signup\" @sl-submit=", ">\n\n      <br>\n\n\t\t\t<div class=\"input-group\">\n              <sl-input name=\"firstName\" type=\"text\" placeholder=\"First Name\" required></sl-input>\n            </div>\n\n            <div class=\"input-group\">\n              <sl-input name=\"lastName\" type=\"text\" placeholder=\"Last Name\" required></sl-input>\n            </div>\n\n            <div class=\"input-group\">\n              <sl-input name=\"email\" type=\"email\" placeholder=\"Email\" required></sl-input>\n            </div>\n\n            <div class=\"input-group\">\n              <sl-select name=\"accessLevel\" placeholder=\"I am a ...\">\n                <sl-menu-item value=\"1\">Buyer</sl-menu-item>\n                <sl-menu-item value=\"2\">Seller</sl-menu-item>\n                </sl-select>\n            </div>\n\n            <div class=\"input-group\">\n              <sl-input name=\"password\" type=\"password\" placeholder=\"Password\" required toggle-password></sl-input>\n            </div> \n\n            <sl-button type=\"primary\" class=\"submit-btn\" submit style=\"width: 70%;\">Sign Up</sl-button>\n          </sl-form>\n\t</div>\n\n\t<div class=\"overlay-container\">\n\t\t<div class=\"overlay\">\n\t\t\t<div class=\"overlay-panel overlay-right\">\n\t\t\t\t<h1>Welcome Back!</h1>\n\t\t\t\t<p>Wanna shop or sell? login to continue!</p>\n        <h2></h2>\n\t\t\t\t<sl-button class=\"ghost\" type=\"primary\" submit style=\"width: 40%;\" @click=", ">Sign In</sl-button>\n\t\t\t</div>\n      <img src=\"/images/11.png\" width=\"100%\" height=\"\"/>\n\t\t</div>\n\t</div>\n</div>\n\n    "])), this.signUpSubmitHandler, () => (0, _Router.gotoRoute)('/signin'));
     (0, _litHtml.render)(template, _App.default.rootEl);
   }
 
@@ -8134,7 +8758,7 @@ exports.default = _default;
 var define;
 var global = arguments[3];
 //! moment.js
-//! version : 2.29.1
+//! version : 2.29.4
 //! authors : Tim Wood, Iskren Chernev, Moment.js contributors
 //! license : MIT
 //! momentjs.com
@@ -8211,8 +8835,9 @@ var global = arguments[3];
 
     function map(arr, fn) {
         var res = [],
-            i;
-        for (i = 0; i < arr.length; ++i) {
+            i,
+            arrLen = arr.length;
+        for (i = 0; i < arrLen; ++i) {
             res.push(fn(arr[i], i));
         }
         return res;
@@ -8341,7 +8966,10 @@ var global = arguments[3];
         updateInProgress = false;
 
     function copyConfig(to, from) {
-        var i, prop, val;
+        var i,
+            prop,
+            val,
+            momentPropertiesLen = momentProperties.length;
 
         if (!isUndefined(from._isAMomentObject)) {
             to._isAMomentObject = from._isAMomentObject;
@@ -8374,8 +9002,8 @@ var global = arguments[3];
             to._locale = from._locale;
         }
 
-        if (momentProperties.length > 0) {
-            for (i = 0; i < momentProperties.length; i++) {
+        if (momentPropertiesLen > 0) {
+            for (i = 0; i < momentPropertiesLen; i++) {
                 prop = momentProperties[i];
                 val = from[prop];
                 if (!isUndefined(val)) {
@@ -8430,8 +9058,9 @@ var global = arguments[3];
                 var args = [],
                     arg,
                     i,
-                    key;
-                for (i = 0; i < arguments.length; i++) {
+                    key,
+                    argLen = arguments.length;
+                for (i = 0; i < argLen; i++) {
                     arg = '';
                     if (typeof arguments[i] === 'object') {
                         arg += '\n[' + i + '] ';
@@ -8581,7 +9210,8 @@ var global = arguments[3];
         );
     }
 
-    var formattingTokens = /(\[[^\[]*\])|(\\)?([Hh]mm(ss)?|Mo|MM?M?M?|Do|DDDo|DD?D?D?|ddd?d?|do?|w[o|w]?|W[o|W]?|Qo?|N{1,5}|YYYYYY|YYYYY|YYYY|YY|y{2,4}|yo?|gg(ggg?)?|GG(GGG?)?|e|E|a|A|hh?|HH?|kk?|mm?|ss?|S{1,9}|x|X|zz?|ZZ?|.)/g,
+    var formattingTokens =
+            /(\[[^\[]*\])|(\\)?([Hh]mm(ss)?|Mo|MM?M?M?|Do|DDDo|DD?D?D?|ddd?d?|do?|w[o|w]?|W[o|W]?|Qo?|N{1,5}|YYYYYY|YYYYY|YYYY|YY|y{2,4}|yo?|gg(ggg?)?|GG(GGG?)?|e|E|a|A|hh?|HH?|kk?|mm?|ss?|S{1,9}|x|X|zz?|ZZ?|.)/g,
         localFormattingTokens = /(\[[^\[]*\])|(\\)?(LTS|LT|LL?L?L?|l{1,4})/g,
         formatFunctions = {},
         formatTokenFunctions = {};
@@ -8885,8 +9515,9 @@ var global = arguments[3];
         if (typeof units === 'object') {
             units = normalizeObjectUnits(units);
             var prioritized = getPrioritizedUnits(units),
-                i;
-            for (i = 0; i < prioritized.length; i++) {
+                i,
+                prioritizedLen = prioritized.length;
+            for (i = 0; i < prioritizedLen; i++) {
                 this[prioritized[i].unit](units[prioritized[i].unit]);
             }
         } else {
@@ -8916,7 +9547,8 @@ var global = arguments[3];
         matchTimestamp = /[+-]?\d+(\.\d{1,3})?/, // 123456789 123456789.123
         // any word (or two) characters or numbers including two/three word month in arabic.
         // includes scottish gaelic two word and hyphenated months
-        matchWord = /[0-9]{0,256}['a-z\u00A0-\u05FF\u0700-\uD7FF\uF900-\uFDCF\uFDF0-\uFF07\uFF10-\uFFEF]{1,256}|[\u0600-\u06FF\/]{1,256}(\s*?[\u0600-\u06FF]{1,256}){1,2}/i,
+        matchWord =
+            /[0-9]{0,256}['a-z\u00A0-\u05FF\u0700-\uD7FF\uF900-\uFDCF\uFDF0-\uFF07\uFF10-\uFFEF]{1,256}|[\u0600-\u06FF\/]{1,256}(\s*?[\u0600-\u06FF]{1,256}){1,2}/i,
         regexes;
 
     regexes = {};
@@ -8942,15 +9574,12 @@ var global = arguments[3];
         return regexEscape(
             s
                 .replace('\\', '')
-                .replace(/\\(\[)|\\(\])|\[([^\]\[]*)\]|\\(.)/g, function (
-                    matched,
-                    p1,
-                    p2,
-                    p3,
-                    p4
-                ) {
-                    return p1 || p2 || p3 || p4;
-                })
+                .replace(
+                    /\\(\[)|\\(\])|\[([^\]\[]*)\]|\\(.)/g,
+                    function (matched, p1, p2, p3, p4) {
+                        return p1 || p2 || p3 || p4;
+                    }
+                )
         );
     }
 
@@ -8962,7 +9591,8 @@ var global = arguments[3];
 
     function addParseToken(token, callback) {
         var i,
-            func = callback;
+            func = callback,
+            tokenLen;
         if (typeof token === 'string') {
             token = [token];
         }
@@ -8971,7 +9601,8 @@ var global = arguments[3];
                 array[callback] = toInt(input);
             };
         }
-        for (i = 0; i < token.length; i++) {
+        tokenLen = token.length;
+        for (i = 0; i < tokenLen; i++) {
             tokens[token[i]] = func;
         }
     }
@@ -9082,12 +9713,12 @@ var global = arguments[3];
 
     // LOCALES
 
-    var defaultLocaleMonths = 'January_February_March_April_May_June_July_August_September_October_November_December'.split(
-            '_'
-        ),
-        defaultLocaleMonthsShort = 'Jan_Feb_Mar_Apr_May_Jun_Jul_Aug_Sep_Oct_Nov_Dec'.split(
-            '_'
-        ),
+    var defaultLocaleMonths =
+            'January_February_March_April_May_June_July_August_September_October_November_December'.split(
+                '_'
+            ),
+        defaultLocaleMonthsShort =
+            'Jan_Feb_Mar_Apr_May_Jun_Jul_Aug_Sep_Oct_Nov_Dec'.split('_'),
         MONTHS_IN_FORMAT = /D[oD]?(\[[^\[\]]*\]|\s)+MMMM?/,
         defaultMonthsShortRegex = matchWord,
         defaultMonthsRegex = matchWord;
@@ -9529,14 +10160,12 @@ var global = arguments[3];
     addRegexToken('W', match1to2);
     addRegexToken('WW', match1to2, match2);
 
-    addWeekParseToken(['w', 'ww', 'W', 'WW'], function (
-        input,
-        week,
-        config,
-        token
-    ) {
-        week[token.substr(0, 1)] = toInt(input);
-    });
+    addWeekParseToken(
+        ['w', 'ww', 'W', 'WW'],
+        function (input, week, config, token) {
+            week[token.substr(0, 1)] = toInt(input);
+        }
+    );
 
     // HELPERS
 
@@ -9661,9 +10290,8 @@ var global = arguments[3];
         return ws.slice(n, 7).concat(ws.slice(0, n));
     }
 
-    var defaultLocaleWeekdays = 'Sunday_Monday_Tuesday_Wednesday_Thursday_Friday_Saturday'.split(
-            '_'
-        ),
+    var defaultLocaleWeekdays =
+            'Sunday_Monday_Tuesday_Wednesday_Thursday_Friday_Saturday'.split('_'),
         defaultLocaleWeekdaysShort = 'Sun_Mon_Tue_Wed_Thu_Fri_Sat'.split('_'),
         defaultLocaleWeekdaysMin = 'Su_Mo_Tu_We_Th_Fr_Sa'.split('_'),
         defaultWeekdaysRegex = matchWord,
@@ -10211,6 +10839,11 @@ var global = arguments[3];
         return globalLocale;
     }
 
+    function isLocaleNameSane(name) {
+        // Prevent names that look like filesystem paths, i.e contain '/' or '\'
+        return name.match('^[^/\\\\]*$') != null;
+    }
+
     function loadLocale(name) {
         var oldLocale = null,
             aliasedRequire;
@@ -10219,7 +10852,8 @@ var global = arguments[3];
             locales[name] === undefined &&
             typeof module !== 'undefined' &&
             module &&
-            module.exports
+            module.exports &&
+            isLocaleNameSane(name)
         ) {
             try {
                 oldLocale = globalLocale._abbr;
@@ -10436,8 +11070,10 @@ var global = arguments[3];
 
     // iso 8601 regex
     // 0000-00-00 0000-W00 or 0000-W00-0 + T + 00 or 00:00 or 00:00:00 or 00:00:00.000 + +00:00 or +0000 or +00)
-    var extendedIsoRegex = /^\s*((?:[+-]\d{6}|\d{4})-(?:\d\d-\d\d|W\d\d-\d|W\d\d|\d\d\d|\d\d))(?:(T| )(\d\d(?::\d\d(?::\d\d(?:[.,]\d+)?)?)?)([+-]\d\d(?::?\d\d)?|\s*Z)?)?$/,
-        basicIsoRegex = /^\s*((?:[+-]\d{6}|\d{4})(?:\d\d\d\d|W\d\d\d|W\d\d|\d\d\d|\d\d|))(?:(T| )(\d\d(?:\d\d(?:\d\d(?:[.,]\d+)?)?)?)([+-]\d\d(?::?\d\d)?|\s*Z)?)?$/,
+    var extendedIsoRegex =
+            /^\s*((?:[+-]\d{6}|\d{4})-(?:\d\d-\d\d|W\d\d-\d|W\d\d|\d\d\d|\d\d))(?:(T| )(\d\d(?::\d\d(?::\d\d(?:[.,]\d+)?)?)?)([+-]\d\d(?::?\d\d)?|\s*Z)?)?$/,
+        basicIsoRegex =
+            /^\s*((?:[+-]\d{6}|\d{4})(?:\d\d\d\d|W\d\d\d|W\d\d|\d\d\d|\d\d|))(?:(T| )(\d\d(?:\d\d(?:\d\d(?:[.,]\d+)?)?)?)([+-]\d\d(?::?\d\d)?|\s*Z)?)?$/,
         tzRegex = /Z|[+-]\d\d(?::?\d\d)?/,
         isoDates = [
             ['YYYYYY-MM-DD', /[+-]\d{6}-\d\d-\d\d/],
@@ -10468,7 +11104,8 @@ var global = arguments[3];
         ],
         aspNetJsonRegex = /^\/?Date\((-?\d+)/i,
         // RFC 2822 regex: For details see https://tools.ietf.org/html/rfc2822#section-3.3
-        rfc2822 = /^(?:(Mon|Tue|Wed|Thu|Fri|Sat|Sun),?\s)?(\d{1,2})\s(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s(\d{2,4})\s(\d\d):(\d\d)(?::(\d\d))?\s(?:(UT|GMT|[ECMP][SD]T)|([Zz])|([+-]\d{4}))$/,
+        rfc2822 =
+            /^(?:(Mon|Tue|Wed|Thu|Fri|Sat|Sun),?\s)?(\d{1,2})\s(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s(\d{2,4})\s(\d\d):(\d\d)(?::(\d\d))?\s(?:(UT|GMT|[ECMP][SD]T)|([Zz])|([+-]\d{4}))$/,
         obsOffsets = {
             UT: 0,
             GMT: 0,
@@ -10491,12 +11128,13 @@ var global = arguments[3];
             allowTime,
             dateFormat,
             timeFormat,
-            tzFormat;
+            tzFormat,
+            isoDatesLen = isoDates.length,
+            isoTimesLen = isoTimes.length;
 
         if (match) {
             getParsingFlags(config).iso = true;
-
-            for (i = 0, l = isoDates.length; i < l; i++) {
+            for (i = 0, l = isoDatesLen; i < l; i++) {
                 if (isoDates[i][1].exec(match[1])) {
                     dateFormat = isoDates[i][0];
                     allowTime = isoDates[i][2] !== false;
@@ -10508,7 +11146,7 @@ var global = arguments[3];
                 return;
             }
             if (match[3]) {
-                for (i = 0, l = isoTimes.length; i < l; i++) {
+                for (i = 0, l = isoTimesLen; i < l; i++) {
                     if (isoTimes[i][1].exec(match[3])) {
                         // match[2] should be 'T' or space
                         timeFormat = (match[2] || ' ') + isoTimes[i][0];
@@ -10575,7 +11213,7 @@ var global = arguments[3];
     function preprocessRFC2822(s) {
         // Remove comments and folding whitespace and replace multiple-spaces with a single space
         return s
-            .replace(/\([^)]*\)|[\n\t]/g, ' ')
+            .replace(/\([^()]*\)|[\n\t]/g, ' ')
             .replace(/(\s\s+)/g, ' ')
             .replace(/^\s\s*/, '')
             .replace(/\s\s*$/, '');
@@ -10888,12 +11526,13 @@ var global = arguments[3];
             skipped,
             stringLength = string.length,
             totalParsedInputLength = 0,
-            era;
+            era,
+            tokenLen;
 
         tokens =
             expandFormat(config._f, config._locale).match(formattingTokens) || [];
-
-        for (i = 0; i < tokens.length; i++) {
+        tokenLen = tokens.length;
+        for (i = 0; i < tokenLen; i++) {
             token = tokens[i];
             parsedInput = (string.match(getParseRegexForToken(token, config)) ||
                 [])[0];
@@ -10988,15 +11627,16 @@ var global = arguments[3];
             i,
             currentScore,
             validFormatFound,
-            bestFormatIsValid = false;
+            bestFormatIsValid = false,
+            configfLen = config._f.length;
 
-        if (config._f.length === 0) {
+        if (configfLen === 0) {
             getParsingFlags(config).invalidFormat = true;
             config._d = new Date(NaN);
             return;
         }
 
-        for (i = 0; i < config._f.length; i++) {
+        for (i = 0; i < configfLen; i++) {
             currentScore = 0;
             validFormatFound = false;
             tempConfig = copyConfig({}, config);
@@ -11237,7 +11877,8 @@ var global = arguments[3];
     function isDurationValid(m) {
         var key,
             unitHasDecimal = false,
-            i;
+            i,
+            orderLen = ordering.length;
         for (key in m) {
             if (
                 hasOwnProp(m, key) &&
@@ -11250,7 +11891,7 @@ var global = arguments[3];
             }
         }
 
-        for (i = 0; i < ordering.length; ++i) {
+        for (i = 0; i < orderLen; ++i) {
             if (m[ordering[i]]) {
                 if (unitHasDecimal) {
                     return false; // only allow non-integers for smallest unit
@@ -11575,7 +12216,8 @@ var global = arguments[3];
         // from http://docs.closure-library.googlecode.com/git/closure_goog_date_date.js.source.html
         // somewhat more in line with 4.4.3.2 2004 spec, but allows decimal anywhere
         // and further modified to allow for strings containing both week and day
-        isoRegex = /^(-|\+)?P(?:([-+]?[0-9,.]*)Y)?(?:([-+]?[0-9,.]*)M)?(?:([-+]?[0-9,.]*)W)?(?:([-+]?[0-9,.]*)D)?(?:T(?:([-+]?[0-9,.]*)H)?(?:([-+]?[0-9,.]*)M)?(?:([-+]?[0-9,.]*)S)?)?$/;
+        isoRegex =
+            /^(-|\+)?P(?:([-+]?[0-9,.]*)Y)?(?:([-+]?[0-9,.]*)M)?(?:([-+]?[0-9,.]*)W)?(?:([-+]?[0-9,.]*)D)?(?:T(?:([-+]?[0-9,.]*)H)?(?:([-+]?[0-9,.]*)M)?(?:([-+]?[0-9,.]*)S)?)?$/;
 
     function createDuration(input, key) {
         var duration = input,
@@ -11796,9 +12438,10 @@ var global = arguments[3];
                 'ms',
             ],
             i,
-            property;
+            property,
+            propertyLen = properties.length;
 
-        for (i = 0; i < properties.length; i += 1) {
+        for (i = 0; i < propertyLen; i += 1) {
             property = properties[i];
             propertyTest = propertyTest || hasOwnProp(input, property);
         }
@@ -12421,19 +13064,17 @@ var global = arguments[3];
     addRegexToken('NNNN', matchEraName);
     addRegexToken('NNNNN', matchEraNarrow);
 
-    addParseToken(['N', 'NN', 'NNN', 'NNNN', 'NNNNN'], function (
-        input,
-        array,
-        config,
-        token
-    ) {
-        var era = config._locale.erasParse(input, token, config._strict);
-        if (era) {
-            getParsingFlags(config).era = era;
-        } else {
-            getParsingFlags(config).invalidEra = input;
+    addParseToken(
+        ['N', 'NN', 'NNN', 'NNNN', 'NNNNN'],
+        function (input, array, config, token) {
+            var era = config._locale.erasParse(input, token, config._strict);
+            if (era) {
+                getParsingFlags(config).era = era;
+            } else {
+                getParsingFlags(config).invalidEra = input;
+            }
         }
-    });
+    );
 
     addRegexToken('y', matchUnsigned);
     addRegexToken('yy', matchUnsigned);
@@ -12725,14 +13366,12 @@ var global = arguments[3];
     addRegexToken('GGGGG', match1to6, match6);
     addRegexToken('ggggg', match1to6, match6);
 
-    addWeekParseToken(['gggg', 'ggggg', 'GGGG', 'GGGGG'], function (
-        input,
-        week,
-        config,
-        token
-    ) {
-        week[token.substr(0, 2)] = toInt(input);
-    });
+    addWeekParseToken(
+        ['gggg', 'ggggg', 'GGGG', 'GGGGG'],
+        function (input, week, config, token) {
+            week[token.substr(0, 2)] = toInt(input);
+        }
+    );
 
     addWeekParseToken(['gg', 'GG'], function (input, week, config, token) {
         week[token] = hooks.parseTwoDigitYear(input);
@@ -13755,7 +14394,7 @@ var global = arguments[3];
 
     //! moment.js
 
-    hooks.version = '2.29.1';
+    hooks.version = '2.29.4';
 
     setHookCallback(createLocal);
 
@@ -13824,57 +14463,9 @@ var _Utils = _interopRequireDefault(require("./../../Utils"));
 
 var _moment = _interopRequireDefault(require("moment"));
 
+var _templateObject, _templateObject2, _templateObject3, _templateObject4, _templateObject5;
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _templateObject5() {
-  const data = _taggedTemplateLiteral([""]);
-
-  _templateObject5 = function _templateObject5() {
-    return data;
-  };
-
-  return data;
-}
-
-function _templateObject4() {
-  const data = _taggedTemplateLiteral([" \n          <h3>Bio:</h3>\n          <p>", "</p>"]);
-
-  _templateObject4 = function _templateObject4() {
-    return data;
-  };
-
-  return data;
-}
-
-function _templateObject3() {
-  const data = _taggedTemplateLiteral(["\n        <sl-avatar style=\"--size: 200px; margin-bottom: 1em;\"></sl-avatar>\n        "]);
-
-  _templateObject3 = function _templateObject3() {
-    return data;
-  };
-
-  return data;
-}
-
-function _templateObject2() {
-  const data = _taggedTemplateLiteral(["\n          <sl-avatar style=\"--size: 200px; margin-bottom: 1em;\" image=", "></sl-avatar>\n        "]);
-
-  _templateObject2 = function _templateObject2() {
-    return data;
-  };
-
-  return data;
-}
-
-function _templateObject() {
-  const data = _taggedTemplateLiteral(["\n      <va-app-header title=\"Profile\" user=\"", "\"></va-app-header>\n      <div class=\"page-content calign\">        \n        <div class=\"profil-content\">\n        ", "\n        <h2>", " ", "</h2>\n\n        <h3>Email: </h3>\n        <p>", "</p>\n\n\n        ", "\n        <p>Updated: ", "</p>\n        <sl-button @click=", ">Edit Profile</sl-button>\n      </div>\n      </div>    \n\n      <div class=\"bk-image\" >\n        <img width=\"1000px\" height= \"100%\" src=\"/images/library2.svg\" page-centered alt=\"\">\n        </div>\n      \n    "]);
-
-  _templateObject = function _templateObject() {
-    return data;
-  };
-
-  return data;
-}
 
 function _taggedTemplateLiteral(strings, raw) { if (!raw) { raw = strings.slice(0); } return Object.freeze(Object.defineProperties(strings, { raw: { value: Object.freeze(raw) } })); }
 
@@ -13888,7 +14479,7 @@ class ProfileView {
   }
 
   render() {
-    const template = (0, _litHtml.html)(_templateObject(), JSON.stringify(_Auth.default.currentUser), _Auth.default.currentUser && _Auth.default.currentUser.avatar ? (0, _litHtml.html)(_templateObject2(), _Auth.default.currentUser && _Auth.default.currentUser.avatar ? "".concat(_App.default.apiBase, "/images/").concat(_Auth.default.currentUser.avatar) : '') : (0, _litHtml.html)(_templateObject3()), _Auth.default.currentUser.firstName, _Auth.default.currentUser.lastName, _Auth.default.currentUser.email, _Auth.default.currentUser.bio ? (0, _litHtml.html)(_templateObject4(), _Auth.default.currentUser.bio) : (0, _litHtml.html)(_templateObject5()), (0, _moment.default)(_Auth.default.currentUser.updatedAt).format('MMMM Do YYYY, @ h:mm a'), () => (0, _Router.gotoRoute)('/editProfile'));
+    const template = (0, _litHtml.html)(_templateObject || (_templateObject = _taggedTemplateLiteral(["\n      <va-app-header title=\"Profile\" user=\"", "\"></va-app-header>\n      <div class=\"page-content calign\">        \n        <div class=\"profil-content\">\n        ", "\n        <h2>", " ", "</h2>\n\n        <h3>Email: </h3>\n        <p>", "</p>\n\n\n        ", "\n        <p>Updated: ", "</p>\n        <sl-button @click=", ">Edit Profile</sl-button>\n      </div>\n      </div>    \n\n\n      \n    "])), JSON.stringify(_Auth.default.currentUser), _Auth.default.currentUser && _Auth.default.currentUser.avatar ? (0, _litHtml.html)(_templateObject2 || (_templateObject2 = _taggedTemplateLiteral(["\n          <sl-avatar style=\"--size: 200px; margin-bottom: 1em;\" image=", "></sl-avatar>\n        "])), _Auth.default.currentUser && _Auth.default.currentUser.avatar ? "".concat(_App.default.apiBase, "/images/").concat(_Auth.default.currentUser.avatar) : '') : (0, _litHtml.html)(_templateObject3 || (_templateObject3 = _taggedTemplateLiteral(["\n        <sl-avatar style=\"--size: 200px; margin-bottom: 1em;\"></sl-avatar>\n        "]))), _Auth.default.currentUser.firstName, _Auth.default.currentUser.lastName, _Auth.default.currentUser.email, _Auth.default.currentUser.bio ? (0, _litHtml.html)(_templateObject4 || (_templateObject4 = _taggedTemplateLiteral([" \n          <h3>Bio:</h3>\n          <p>", "</p>"])), _Auth.default.currentUser.bio) : (0, _litHtml.html)(_templateObject5 || (_templateObject5 = _taggedTemplateLiteral([""]))), (0, _moment.default)(_Auth.default.currentUser.updatedAt).format('MMMM Do YYYY, @ h:mm a'), () => (0, _Router.gotoRoute)('/editProfile'));
     (0, _litHtml.render)(template, _App.default.rootEl);
   }
 
@@ -13981,18 +14572,18 @@ class UserAPI {
     return data;
   }
 
-  async addBookLib(bookId) {
+  async addArtworkLib(artworkId) {
     // validate
-    if (!bookId) return; // fetch the json data
+    if (!artworkId) return; // fetch the json data
 
-    const response = await fetch("".concat(_App.default.apiBase, "/user/addBookLib"), {
+    const response = await fetch("".concat(_App.default.apiBase, "/user/addArtworkLib"), {
       method: "PUT",
       headers: {
         "Authorization": "Bearer ".concat(localStorage.accessToken),
         "Content-Type": 'application/json'
       },
       body: JSON.stringify({
-        bookId: bookId
+        artworkId: artworkId
       })
     }); // if response not ok
 
@@ -14001,7 +14592,7 @@ class UserAPI {
       const err = await response.json();
       if (err) console.log(err); // throw error (exit this function)      
 
-      throw new Error('Problem adding book to library');
+      throw new Error('Problem adding artwork to library');
     } // convert response payload into json - store as data
 
 
@@ -14039,57 +14630,9 @@ var _Toast = _interopRequireDefault(require("../../Toast"));
 
 var _moment = _interopRequireDefault(require("moment"));
 
+var _templateObject, _templateObject2, _templateObject3, _templateObject4, _templateObject5;
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _templateObject5() {
-  const data = _taggedTemplateLiteral(["\n                <input type=\"file\" name=\"avatar\" />\n              "]);
-
-  _templateObject5 = function _templateObject5() {
-    return data;
-  };
-
-  return data;
-}
-
-function _templateObject4() {
-  const data = _taggedTemplateLiteral(["\n                <sl-avatar image=\"", "/images/", "\"></sl-avatar>\n                <input type=\"file\" name=\"avatar\" />\n              "]);
-
-  _templateObject4 = function _templateObject4() {
-    return data;
-  };
-
-  return data;
-}
-
-function _templateObject3() {
-  const data = _taggedTemplateLiteral(["\n          <p>Updated: ", "</p>\n          <sl-form class=\"page-form\" @sl-submit=", ">\n            <div class=\"input-group\">\n              <sl-input type=\"text\" name=\"firstName\" value=\"", "\" placeholder=\"First Name\"></sl-input>\n            </div>\n            <div class=\"input-group\">\n              <sl-input type=\"text\" name=\"lastName\" value=\"", "\" placeholder=\"Last Name\"></sl-input>\n            </div>\n            <div class=\"input-group\">\n              <sl-input type=\"text\" name=\"email\" value=\"", "\" placeholder=\"Email Address\"></sl-input>\n            </div>      \n            \n            <div class=\"input-group\">\n            <sl-textarea name=\"bio\" rows=\"4\" placeholder=\"Bio\" value=\"", "\"></sl-textarea>\n            </div>\n            <div class=\"input-group\">\n              <label>Avatar</label><br>          \n              ", "\n            </div>\n            <sl-button type=\"primary\" class=\"submit-btn\" submit>Update Profile</sl-button>\n          </sl-form>\n        "]);
-
-  _templateObject3 = function _templateObject3() {
-    return data;
-  };
-
-  return data;
-}
-
-function _templateObject2() {
-  const data = _taggedTemplateLiteral(["\n          <sl-spinner></sl-spinner>\n        "]);
-
-  _templateObject2 = function _templateObject2() {
-    return data;
-  };
-
-  return data;
-}
-
-function _templateObject() {
-  const data = _taggedTemplateLiteral(["\n      <va-app-header title=\"Edit Profile\" user=", "></va-app-header>\n      <div class=\"page-content\">        \n        ", "\n      </div>\n    "]);
-
-  _templateObject = function _templateObject() {
-    return data;
-  };
-
-  return data;
-}
 
 function _taggedTemplateLiteral(strings, raw) { if (!raw) { raw = strings.slice(0); } return Object.freeze(Object.defineProperties(strings, { raw: { value: Object.freeze(raw) } })); }
 
@@ -14136,7 +14679,7 @@ class EditProfileView {
   }
 
   render() {
-    const template = (0, _litHtml.html)(_templateObject(), JSON.stringify(_Auth.default.currentUser), this.user == null ? (0, _litHtml.html)(_templateObject2()) : (0, _litHtml.html)(_templateObject3(), (0, _moment.default)(_Auth.default.currentUser.updatedAt).format('MMMM Do YYYY, @ h:mm a'), this.updateProfileSubmitHandler.bind(this), this.user.firstName, this.user.lastName, this.user.email, this.user.bio, this.user.avatar ? (0, _litHtml.html)(_templateObject4(), _App.default.apiBase, this.user.avatar) : (0, _litHtml.html)(_templateObject5())));
+    const template = (0, _litHtml.html)(_templateObject || (_templateObject = _taggedTemplateLiteral(["\n      <va-app-header title=\"Edit Profile\" user=", "></va-app-header>\n      <div class=\"page-content\">        \n        ", "\n      </div>\n    "])), JSON.stringify(_Auth.default.currentUser), this.user == null ? (0, _litHtml.html)(_templateObject2 || (_templateObject2 = _taggedTemplateLiteral(["\n          <sl-spinner></sl-spinner>\n        "]))) : (0, _litHtml.html)(_templateObject3 || (_templateObject3 = _taggedTemplateLiteral(["\n          <p>Updated: ", "</p>\n          <sl-form class=\"page-form\" @sl-submit=", ">\n            <div class=\"input-group\">\n              <sl-input type=\"text\" name=\"firstName\" value=\"", "\" placeholder=\"First Name\"></sl-input>\n            </div>\n            <div class=\"input-group\">\n              <sl-input type=\"text\" name=\"lastName\" value=\"", "\" placeholder=\"Last Name\"></sl-input>\n            </div>\n            <div class=\"input-group\">\n              <sl-input type=\"text\" name=\"email\" value=\"", "\" placeholder=\"Email Address\"></sl-input>\n            </div>      \n            \n            <div class=\"input-group\">\n            <sl-textarea name=\"bio\" rows=\"4\" placeholder=\"Bio\" value=\"", "\"></sl-textarea>\n            </div>\n            <div class=\"input-group\">\n              <label>Avatar</label><br>          \n              ", "\n            </div>\n            <sl-button type=\"primary\" class=\"submit-btn\" submit>Update Profile</sl-button>\n          </sl-form>\n        "])), (0, _moment.default)(_Auth.default.currentUser.updatedAt).format('MMMM Do YYYY, @ h:mm a'), this.updateProfileSubmitHandler.bind(this), this.user.firstName, this.user.lastName, this.user.email, this.user.bio, this.user.avatar ? (0, _litHtml.html)(_templateObject4 || (_templateObject4 = _taggedTemplateLiteral(["\n                <sl-avatar image=\"", "/images/", "\"></sl-avatar>\n                <input type=\"file\" name=\"avatar\" />\n              "])), _App.default.apiBase, this.user.avatar) : (0, _litHtml.html)(_templateObject5 || (_templateObject5 = _taggedTemplateLiteral(["\n                <input type=\"file\" name=\"avatar\" />\n              "])))));
     (0, _litHtml.render)(template, _App.default.rootEl);
   }
 
@@ -14167,47 +14710,9 @@ var _UserAPI = _interopRequireDefault(require("./../../UserAPI"));
 
 var _Toast = _interopRequireDefault(require("./../../Toast"));
 
+var _templateObject, _templateObject2, _templateObject3, _templateObject4;
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _templateObject4() {
-  const data = _taggedTemplateLiteral(["\n            <va-book class=\"book-card\"\n              id=\"", "\"\n              name=\"", "\"\n              author=\"", "\"\n              description=\"", "\"\n              user=\"", "\"\n              image=\"", "\"\n              genre=\"", "\"\n              summary=\"", "\"\n            >        \n            </va-book>\n\n          "]);
-
-  _templateObject4 = function _templateObject4() {
-    return data;
-  };
-
-  return data;
-}
-
-function _templateObject3() {
-  const data = _taggedTemplateLiteral(["\n          ", "\n        "]);
-
-  _templateObject3 = function _templateObject3() {
-    return data;
-  };
-
-  return data;
-}
-
-function _templateObject2() {
-  const data = _taggedTemplateLiteral(["\n        <sl-spinner></sl-spinner>\n        "]);
-
-  _templateObject2 = function _templateObject2() {
-    return data;
-  };
-
-  return data;
-}
-
-function _templateObject() {
-  const data = _taggedTemplateLiteral(["\n      <va-app-header title=\"My Library\" user=\"", "\"></va-app-header>\n      <div class=\"page-content\">        \n        <h1>My Library</h1>\n        <div class=\"books-grid\">\n        ", "\n        </div>\n        \n      </div>      \n    "]);
-
-  _templateObject = function _templateObject() {
-    return data;
-  };
-
-  return data;
-}
 
 function _taggedTemplateLiteral(strings, raw) { if (!raw) { raw = strings.slice(0); } return Object.freeze(Object.defineProperties(strings, { raw: { value: Object.freeze(raw) } })); }
 
@@ -14234,7 +14739,7 @@ class MyLibraryView {
   }
 
   render() {
-    const template = (0, _litHtml.html)(_templateObject(), JSON.stringify(_Auth.default.currentUser), this.myLibrary == null ? (0, _litHtml.html)(_templateObject2()) : (0, _litHtml.html)(_templateObject3(), this.myLibrary.map(book => (0, _litHtml.html)(_templateObject4(), book._id, book.name, book.author, book.description, JSON.stringify(book.user), book.image, book.genre, book.summary))));
+    const template = (0, _litHtml.html)(_templateObject || (_templateObject = _taggedTemplateLiteral(["\n      <va-app-header title=\"My Library\" user=\"", "\"></va-app-header>\n      <div class=\"page-content\">   \n      <div class=\"bn\">     \n        <h1>Cart</h1>\n      </div>\n        <div class=\"artworks-grid\">\n        ", "\n        </div>\n        <div class=\"bn\">\n      <button onclick=\"alert('Youre all set!');\">Buy Now</button>\n</div>\n      </div> \n\n    "])), JSON.stringify(_Auth.default.currentUser), this.myLibrary == null ? (0, _litHtml.html)(_templateObject2 || (_templateObject2 = _taggedTemplateLiteral(["\n        <sl-spinner></sl-spinner>\n        "]))) : (0, _litHtml.html)(_templateObject3 || (_templateObject3 = _taggedTemplateLiteral(["\n          ", "\n        "])), this.myLibrary.map(artwork => (0, _litHtml.html)(_templateObject4 || (_templateObject4 = _taggedTemplateLiteral(["\n            <va-artwork class=\"artwork-card\"\n              id=\"", "\"\n              name=\"", "\"\n              author=\"", "\"\n              price=\"", "\"\n              user=\"", "\"\n              image=\"", "\"\n              genre=\"", "\"\n              summary=\"", "\"\n            >        \n            </va-artwork>\n\n          "])), artwork._id, artwork.name, artwork.author, artwork.price, JSON.stringify(artwork.user), artwork.image, artwork.genre, artwork.summary))));
     (0, _litHtml.render)(template, _App.default.rootEl);
   }
 
@@ -14265,17 +14770,9 @@ var _UserAPI = _interopRequireDefault(require("./../../UserAPI"));
 
 var _Toast = _interopRequireDefault(require("../../Toast"));
 
+var _templateObject;
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _templateObject() {
-  const data = _taggedTemplateLiteral(["\n      <va-app-header title=\"Guide\" user=\"", "\"></va-app-header>\n      <div class=\"page-content calign\">        \n        \n        <h2 class=\"brand-color\">Welcome ", "!</h2>\n        <p>This is a quick tour to teach you the basics of using Dbook in the most effective way</p>\n        \n        <div class=\"guide-step\">\n          <h4>Find a Book with the Filter</h4>\n          <img src=\"/images/findFilter.jpg\">\n        </div>\n        \n        <div class=\"guide-step\">\n          <h4>Access or modify your Profil</h4>\n          <img src=\"/images/accessProfil.jpg\">\n        </div>\n        \n        <div class=\"guide-step\">\n          <h4>Add a book to you Library or Read a summary</h4>\n          <img src=\"/images/addLibrary.jpg\">\n        </div>\n\n        \n        <sl-button type=\"primary\" @click=", ">Okay got it!</sl-button>\n        \n      </div>      \n    "]);
-
-  _templateObject = function _templateObject() {
-    return data;
-  };
-
-  return data;
-}
 
 function _taggedTemplateLiteral(strings, raw) { if (!raw) { raw = strings.slice(0); } return Object.freeze(Object.defineProperties(strings, { raw: { value: Object.freeze(raw) } })); }
 
@@ -14302,7 +14799,7 @@ class GuideView {
   }
 
   render() {
-    const template = (0, _litHtml.html)(_templateObject(), JSON.stringify(_Auth.default.currentUser), _Auth.default.currentUser.firstName, () => (0, _Router.gotoRoute)('/'));
+    const template = (0, _litHtml.html)(_templateObject || (_templateObject = _taggedTemplateLiteral(["\n      <va-app-header title=\"Guide\" user=\"", "\"></va-app-header>\n      <div class=\"page-content calign\">        \n        \n        <h2 class=\"brand-color\">Welcome ", "!</h2>\n        <p>This is a quick tour to teach you the basics of using Creative Artwork in the most effective way</p>\n        \n        <div class=\"guide-step\">\n          <h4>Find an Artwork with the Filter</h4>\n          <img src=\"/images/filter.png\">\n        </div>\n        \n        <div class=\"guide-step\">\n          <h4>Add an artwork to your Cart</h4>\n          <img src=\"/images/tocart.png\">\n        </div>\n        \n        <div class=\"guide-step\">\n          <h4>Go to your Cart</h4>\n          <img src=\"/images/acart.png\">\n        </div>\n\n        <div class=\"guide-step\">\n          <h4>Sell your Artworks</h4>\n          <img src=\"/images/sell.png\">\n        </div>\n        \n        <div class=\"guide-step\">\n          <h4>Buy Artworks</h4>\n          <img src=\"/images/buy.png\">\n        </div>\n\n        <sl-button type=\"primary\" @click=", ">Okay got it!</sl-button>\n        \n      </div>      \n    "])), JSON.stringify(_Auth.default.currentUser), _Auth.default.currentUser.firstName, () => (0, _Router.gotoRoute)('/'));
     (0, _litHtml.render)(template, _App.default.rootEl);
   }
 
@@ -14311,7 +14808,7 @@ class GuideView {
 var _default = new GuideView();
 
 exports.default = _default;
-},{"../../App":"App.js","lit-html":"../node_modules/lit-html/lit-html.js","../../Router":"Router.js","../../Auth":"Auth.js","../../Utils":"Utils.js","./../../UserAPI":"UserAPI.js","../../Toast":"Toast.js"}],"views/pages/newbook.js":[function(require,module,exports) {
+},{"../../App":"App.js","lit-html":"../node_modules/lit-html/lit-html.js","../../Router":"Router.js","../../Auth":"Auth.js","../../Utils":"Utils.js","./../../UserAPI":"UserAPI.js","../../Toast":"Toast.js"}],"views/pages/newartwork.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -14329,42 +14826,34 @@ var _Auth = _interopRequireDefault(require("../../Auth"));
 
 var _Utils = _interopRequireDefault(require("../../Utils"));
 
-var _BookAPI = _interopRequireDefault(require("../../BookAPI"));
+var _ArtworkAPI = _interopRequireDefault(require("../../ArtworkAPI"));
 
 var _Toast = _interopRequireDefault(require("../../Toast"));
 
+var _templateObject;
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _templateObject() {
-  const data = _taggedTemplateLiteral(["\n      <va-app-header title=\"New Book\" user=\"", "\"></va-app-header>\n      <div class=\"page-content\">        \n        <h1>New Book</h1>\n        <sl-form class=\"page-form\" @sl-submit=", ">\n        <input type=\"hidden\" name=\"user\" value=\"", "\" />\n        <div class=\"input-group\">\n          <h3>Book Name:</h3> \n          <sl-input name=\"name\" type=\"text\" placeholder=\"Vigneron's Life\" required></sl-input>\n        </div>\n        \n        <div class=\"input-group\">\n          <h3>Author:</h3> \n          <sl-textarea name=\"author\" rows=\"1\" placeholder=\"Louis Vigneron\" required></sl-textarea>\n        </div>\n        \n        <div class=\"input-group\" style=\"margin-bottom: 1em; margin-top: 1em;\">\n            <h3>Genre:</h3> \n            <sl-radio-group label=\"Select book genre\" no-fieldset>\n              <sl-radio name=\"genre\" value=\"crime\">Crime</sl-radio>\n              <sl-radio name=\"genre\" value=\"fantasy\">Fantasy</sl-radio>\n              <sl-radio name=\"genre\" value=\"horror\">Horror</sl-radio>\n              <sl-radio name=\"genre\" value=\"memoir\">Memoir</sl-radio>\n              <sl-radio name=\"genre\" value=\"guide\">Guide</sl-radio>\n              <sl-radio name=\"genre\" value=\"romance\">Romance</sl-radio>\n              <sl-radio name=\"genre\" value=\"action\">Action</sl-radio>\n              <sl-radio name=\"genre\" value=\"poetry\">Poetry</sl-radio>\n              <sl-radio name=\"genre\" value=\"phylosphy\">Phylosophy</sl-radio>\n              <sl-radio name=\"genre\" value=\"biography\">Biography</sl-radio>\n              <sl-radio name=\"genre\" value=\"drama\">Drama</sl-radio>\n              <sl-radio name=\"genre\" value=\"thriller\">Thriller</sl-radio>\n              <sl-radio name=\"genre\" value=\"selfHelp\">Self Help</sl-radio>\n              <sl-radio name=\"genre\" value=\"suspense\">Suspense</sl-radio>\n              <sl-radio name=\"genre\" value=\"mystery\">Mystery</sl-radio>\n            </sl-radio-group>\n          </div>\n\n        \n        <div class=\"input-group\">\n          <h3>Book Description:</h3> \n          <sl-textarea name=\"description\" rows=\"3\" placeholder=\"The book was published in 1532 by .......\" required></sl-textarea>\n        </div>\n        \n        <div class=\"input-group\">\n          <h3>Book Summary:</h3> \n          <sl-textarea name=\"summary\" rows=\"4\" placeholder=\"Summary\" required></sl-textarea>\n        </div>\n        \n        <div class=\"input-group\" style=\"margin-bottom: 2em;\">\n          <label>Image</label><br>\n          <input type=\"file\" name=\"image\" />              \n        </div>\n        <sl-button type=\"primary\" class=\"submit-btn\" submit>Add Book</sl-button>\n        </sl-form>  \n\n        \n      </div>      \n    "]);
-
-  _templateObject = function _templateObject() {
-    return data;
-  };
-
-  return data;
-}
 
 function _taggedTemplateLiteral(strings, raw) { if (!raw) { raw = strings.slice(0); } return Object.freeze(Object.defineProperties(strings, { raw: { value: Object.freeze(raw) } })); }
 
-class NewBookView {
+class NewArtworkView {
   init() {
-    document.title = 'New Book';
+    document.title = 'New Artwork';
     this.render();
 
     _Utils.default.pageIntroAnim();
   }
 
-  async newBookSubmitHandler(e) {
+  async newArtworkSubmitHandler(e) {
     e.preventDefault();
     const submitBtn = document.querySelector('.submit-btn');
     submitBtn.setAttribute('loading', '');
     const formData = e.detail.formData;
 
     try {
-      await _BookAPI.default.newBook(formData);
+      await _ArtworkAPI.default.newArtwork(formData);
 
-      _Toast.default.show('Book added!');
+      _Toast.default.show('Artwork added!');
 
       submitBtn.removeAttribute('loading'); //reset data
 
@@ -14384,24 +14873,24 @@ class NewBookView {
   }
 
   render() {
-    const template = (0, _litHtml.html)(_templateObject(), JSON.stringify(_Auth.default.currentUser), this.newBookSubmitHandler, _Auth.default.currentUser._id);
+    const template = (0, _litHtml.html)(_templateObject || (_templateObject = _taggedTemplateLiteral(["\n      <va-app-header title=\"New Artwork\" user=\"", "\"></va-app-header>\n      <div class=\"page-content\">        \n        <h1>New Artwork</h1>\n        <sl-form class=\"page-form\" @sl-submit=", ">\n        <input type=\"hidden\" name=\"user\" value=\"", "\" />\n        <div class=\"input-group\">\n          <h3>Artwork Name:</h3> \n          <sl-input name=\"name\" type=\"text\" placeholder=\"Mona Lisa\" required></sl-input>\n        </div>\n        \n        <div class=\"input-group\">\n          <h3>Author:</h3> \n          <sl-textarea name=\"author\" rows=\"1\" placeholder=\"Leonardo da Vinci\" required></sl-textarea>\n        </div>\n        \n        <div class=\"input-group\" style=\"margin-bottom: 1em; margin-top: 1em;\">\n            <h3>Genre:</h3> \n            <sl-radio-group label=\"Select artwork genre\" no-fieldset>\n\n              <sl-radio name=\"genre\" value=\"shading\">Shading</sl-radio>\n              <sl-radio name=\"genre\" value=\"portrait\">Portrait</sl-radio>\n              <sl-radio name=\"genre\" value=\"horror\">Horror</sl-radio>\n              <sl-radio name=\"genre\" value=\"oilPainting\">Oil Painting</sl-radio>\n              <sl-radio name=\"genre\" value=\"romance\">Romance</sl-radio>\n              <sl-radio name=\"genre\" value=\"action\">Action</sl-radio>\n              <sl-radio name=\"genre\" value=\"poetry\">Poetry</sl-radio>\n              <sl-radio name=\"genre\" value=\"colouredPencil\">Coloured Pencil</sl-radio>\n              <sl-radio name=\"genre\" value=\"detailed\">Detailed</sl-radio>\n              <sl-radio name=\"genre\" value=\"drama\">Drama</sl-radio>\n              <sl-radio name=\"genre\" value=\"thriller\">Thriller</sl-radio>\n              <sl-radio name=\"genre\" value=\"selfHelp\">Self Help</sl-radio>\n              <sl-radio name=\"genre\" value=\"small\">Small</sl-radio>\n              <sl-radio name=\"genre\" value=\"mystery\">Mystery</sl-radio>\n\n            </sl-radio-group>\n          </div>\n\n        \n        <div class=\"input-group\">\n          <h3>Artwork Price:</h3> \n          <sl-textarea name=\"price\" rows=\"3\" placeholder=\"49\" required></sl-textarea>\n        </div>\n        \n        <div class=\"input-group\">\n          <h3>Artwork Summary:</h3> \n          <sl-textarea name=\"summary\" rows=\"4\" placeholder=\"Summary\" required></sl-textarea>\n        </div>\n        \n        <div class=\"input-group\" style=\"margin-bottom: 2em;\">\n          <label>Image</label><br>\n          <input type=\"file\" name=\"image\" />              \n        </div>\n        <sl-button type=\"primary\" class=\"submit-btn\" submit>Add Artwork</sl-button>\n        </sl-form>  \n\n        \n      </div>      \n    "])), JSON.stringify(_Auth.default.currentUser), this.newArtworkSubmitHandler, _Auth.default.currentUser._id);
     (0, _litHtml.render)(template, _App.default.rootEl);
   }
 
 }
 
-var _default = new NewBookView();
+var _default = new NewArtworkView();
 
 exports.default = _default;
-},{"../../App":"App.js","lit-html":"../node_modules/lit-html/lit-html.js","../../Router":"Router.js","../../Auth":"Auth.js","../../Utils":"Utils.js","../../BookAPI":"BookAPI.js","../../Toast":"Toast.js"}],"Router.js":[function(require,module,exports) {
+},{"../../App":"App.js","lit-html":"../node_modules/lit-html/lit-html.js","../../Router":"Router.js","../../Auth":"Auth.js","../../Utils":"Utils.js","../../ArtworkAPI":"ArtworkAPI.js","../../Toast":"Toast.js"}],"Router.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.gotoRoute = gotoRoute;
 exports.anchorRoute = anchorRoute;
 exports.default = void 0;
+exports.gotoRoute = gotoRoute;
 
 var _home = _interopRequireDefault(require("./views/pages/home"));
 
@@ -14415,13 +14904,13 @@ var _profile = _interopRequireDefault(require("./views/pages/profile"));
 
 var _editProfile = _interopRequireDefault(require("./views/pages/editProfile"));
 
-var _books = _interopRequireDefault(require("./views/pages/books"));
+var _artworks = _interopRequireDefault(require("./views/pages/artworks"));
 
 var _myLibrary = _interopRequireDefault(require("./views/pages/myLibrary"));
 
 var _guide = _interopRequireDefault(require("./views/pages/guide"));
 
-var _newbook = _interopRequireDefault(require("./views/pages/newbook"));
+var _newartwork = _interopRequireDefault(require("./views/pages/newartwork"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -14434,10 +14923,10 @@ const routes = {
   '/signup': _signup.default,
   '/profile': _profile.default,
   '/myLibrary': _myLibrary.default,
-  '/books': _books.default,
+  '/artworks': _artworks.default,
   '/editProfile': _editProfile.default,
   '/guide': _guide.default,
-  '/newBook': _newbook.default
+  '/newArtwork': _newartwork.default
 };
 
 class Router {
@@ -14491,7 +14980,7 @@ function anchorRoute(e) {
   const pathname = e.target.closest('a').pathname;
   AppRouter.gotoRoute(pathname);
 }
-},{"./views/pages/home":"views/pages/home.js","./views/pages/404":"views/pages/404.js","./views/pages/signin":"views/pages/signin.js","./views/pages/signup":"views/pages/signup.js","./views/pages/profile":"views/pages/profile.js","./views/pages/editProfile":"views/pages/editProfile.js","./views/pages/books":"views/pages/books.js","./views/pages/myLibrary":"views/pages/myLibrary.js","./views/pages/guide":"views/pages/guide.js","./views/pages/newbook":"views/pages/newbook.js"}],"App.js":[function(require,module,exports) {
+},{"./views/pages/home":"views/pages/home.js","./views/pages/404":"views/pages/404.js","./views/pages/signin":"views/pages/signin.js","./views/pages/signup":"views/pages/signup.js","./views/pages/profile":"views/pages/profile.js","./views/pages/editProfile":"views/pages/editProfile.js","./views/pages/artworks":"views/pages/artworks.js","./views/pages/myLibrary":"views/pages/myLibrary.js","./views/pages/guide":"views/pages/guide.js","./views/pages/newartwork":"views/pages/newartwork.js"}],"App.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -14509,7 +14998,7 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 
 class App {
   constructor() {
-    this.name = "Dbook";
+    this.name = "Creative Artwork";
     this.version = "1.0.0";
     this.apiBase = 'http://localhost:3000';
     this.rootEl = document.getElementById("root");
@@ -14539,8 +15028,8 @@ exports.default = _default;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.removeNodesFromTemplate = removeNodesFromTemplate;
 exports.insertNodeIntoTemplate = insertNodeIntoTemplate;
+exports.removeNodesFromTemplate = removeNodesFromTemplate;
 
 var _template = require("./template.js");
 
@@ -14707,25 +15196,25 @@ function insertNodeIntoTemplate(template, node, refNode = null) {
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-Object.defineProperty(exports, "html", {
-  enumerable: true,
-  get: function () {
-    return _litHtml.html;
-  }
-});
-Object.defineProperty(exports, "svg", {
-  enumerable: true,
-  get: function () {
-    return _litHtml.svg;
-  }
-});
 Object.defineProperty(exports, "TemplateResult", {
   enumerable: true,
   get: function () {
     return _litHtml.TemplateResult;
   }
 });
-exports.render = exports.shadyTemplateFactory = void 0;
+Object.defineProperty(exports, "html", {
+  enumerable: true,
+  get: function () {
+    return _litHtml.html;
+  }
+});
+exports.shadyTemplateFactory = exports.render = void 0;
+Object.defineProperty(exports, "svg", {
+  enumerable: true,
+  get: function () {
+    return _litHtml.svg;
+  }
+});
 
 var _dom = require("./dom.js");
 
@@ -15064,7 +15553,7 @@ exports.render = render;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.UpdatingElement = exports.notEqual = exports.defaultConverter = void 0;
+exports.notEqual = exports.defaultConverter = exports.UpdatingElement = void 0;
 
 /**
  * @license
@@ -15749,7 +16238,7 @@ UpdatingElement.finalized = true;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.eventOptions = exports.queryAll = exports.query = exports.property = exports.customElement = void 0;
+exports.queryAll = exports.query = exports.property = exports.eventOptions = exports.customElement = void 0;
 
 /**
  * @license
@@ -15965,7 +16454,7 @@ exports.eventOptions = eventOptions;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.css = exports.CSSResult = exports.supportsAdoptingStyleSheets = void 0;
+exports.supportsAdoptingStyleSheets = exports.css = exports.CSSResult = void 0;
 
 /**
 @license
@@ -16034,6 +16523,19 @@ var _exportNames = {
   TemplateResult: true,
   SVGTemplateResult: true
 };
+exports.LitElement = void 0;
+Object.defineProperty(exports, "SVGTemplateResult", {
+  enumerable: true,
+  get: function () {
+    return _litHtml2.SVGTemplateResult;
+  }
+});
+Object.defineProperty(exports, "TemplateResult", {
+  enumerable: true,
+  get: function () {
+    return _litHtml2.TemplateResult;
+  }
+});
 Object.defineProperty(exports, "html", {
   enumerable: true,
   get: function () {
@@ -16046,19 +16548,6 @@ Object.defineProperty(exports, "svg", {
     return _litHtml2.svg;
   }
 });
-Object.defineProperty(exports, "TemplateResult", {
-  enumerable: true,
-  get: function () {
-    return _litHtml2.TemplateResult;
-  }
-});
-Object.defineProperty(exports, "SVGTemplateResult", {
-  enumerable: true,
-  get: function () {
-    return _litHtml2.SVGTemplateResult;
-  }
-});
-exports.LitElement = void 0;
 
 var _litHtml = require("lit-html");
 
@@ -16294,67 +16783,9 @@ var _Auth = _interopRequireDefault(require("./../Auth"));
 
 var _App = _interopRequireDefault(require("./../App"));
 
+var _templateObject, _templateObject2, _templateObject3, _templateObject4, _templateObject5, _templateObject6;
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _templateObject6() {
-  const data = _taggedTemplateLiteral([""]);
-
-  _templateObject6 = function _templateObject6() {
-    return data;
-  };
-
-  return data;
-}
-
-function _templateObject5() {
-  const data = _taggedTemplateLiteral(["<a href=\"/newBook\" @click=\"", "\">Add Book</a> "]);
-
-  _templateObject5 = function _templateObject5() {
-    return data;
-  };
-
-  return data;
-}
-
-function _templateObject4() {
-  const data = _taggedTemplateLiteral([""]);
-
-  _templateObject4 = function _templateObject4() {
-    return data;
-  };
-
-  return data;
-}
-
-function _templateObject3() {
-  const data = _taggedTemplateLiteral(["\n        <a href=\"/newBook\" @click=\"", "\">Add Book</a> \n        "]);
-
-  _templateObject3 = function _templateObject3() {
-    return data;
-  };
-
-  return data;
-}
-
-function _templateObject2() {
-  const data = _taggedTemplateLiteral(["\n          <h1 class=\"page-title\">", "</h1>\n        "]);
-
-  _templateObject2 = function _templateObject2() {
-    return data;
-  };
-
-  return data;
-}
-
-function _templateObject() {
-  const data = _taggedTemplateLiteral(["\n    <style>      \n      * {\n        box-sizing: border-box;\n      }\n      .app-header {\n        background: var(--brand-color);\n        position: fixed;\n        top: 0;\n        right: 0;\n        left: 0;\n        height: var(--app-header-height);\n        color: #fff;\n        display: flex;\n        z-index: 9;\n        box-shadow: 4px 0px 10px rgba(0,0,0,0.2);\n        align-items: center;\n      }\n      \n\n      .app-header-main {\n        flex-grow: 1;\n        display: flex;\n        align-items: center;\n      }\n\n      .app-header-main::slotted(h1){\n        color: #fff;\n      }\n\n      .app-logo a {\n        color: #fff;\n        text-decoration: none;\n        font-weight: bold;\n        font-size: 1.2em;\n        padding: .6em;\n        display: inline-block;        \n      }\n\n      .app-logo img {\n        width: 90px;\n      }\n      \n      .chevron-right-btn::part(base) {\n        color: #fff;\n      }\n\n      .app-top-nav {\n        display: flex;\n        height: 100%;\n        align-items: center;\n      }\n\n      .app-top-nav a {\n        display: inline-block;\n        padding: .8em;\n        text-decoration: none;\n        color: #fff;\n      }\n      \n      .app-side-menu-items a {\n        display: block;\n        padding: .5em;\n        text-decoration: none;\n        font-size: 1.3em;\n        color: #333;\n      }\n\n      .app-side-menu-logo {\n        width: 120px;\n        margin-bottom: 1em;\n        position: absolute;\n        top: 2em;\n        left: 1.5em;\n      }\n\n      .page-title {\n        color: var(--app-header-txt-color);\n        margin-right: 0.5em;\n        font-size: var(--app-header-title-font-size);\n      }\n\n      /* active nav links */\n      .app-top-nav a.active,\n      .app-side-menu-items a.active {\n        font-weight: bold;\n      }\n\n      /* RESPONSIVE - MOBILE ------------------- */\n      @media all and (max-width: 768px){       \n        \n        .app-top-nav {\n          display: none;\n        }\n      }\n\n    </style>\n\n    <header class=\"app-header\">\n      <sl-icon-button class=\"chevron-right-btn\" name=\"chevron-right\" @click=\"", "\" style=\"font-size: 1.5em;\"></sl-icon-button>       \n      \n      <div class=\"app-header-main\">\n        ", "\n        <slot></slot>\n      </div>\n\n      <nav class=\"app-top-nav\">\n        <a href=\"/\" @click=\"", "\">Home</a>  \n        ", "\n      \n             \n\n\n        <sl-dropdown>\n          <a slot=\"trigger\" href=\"#\" @click=\"", "\">\n            <sl-avatar style=\"--size: 24px;\" image=", "></sl-avatar> ", "\n          </a>\n          <sl-menu>            \n            <sl-menu-item @click=\"", "\">Profile</sl-menu-item>\n            <sl-menu-item @click=\"", "\">Edit Profile</sl-menu-item>\n            <sl-menu-item @click=\"", "\">Sign Out</sl-menu-item>\n          </sl-menu>\n        </sl-dropdown>\n      </nav>\n    </header>\n\n    <sl-drawer class=\"app-side-menu\" placement=\"left\">\n      <img class=\"app-side-menu-logo\" src=\"/images/logo.svg\">\n      <nav class=\"app-side-menu-items\">\n        <a href=\"/\" @click=\"", "\"> <sl-icon slot=\"prefix\" name=\"house\"></sl-icon> Home</a>\n        <a href=\"/profile\" @click=\"", "\"> <sl-icon slot=\"prefix\" name=\"person\"></sl-icon> Profile</a>\n        <a href=\"/myLibrary\" @click=\"", "\"> <sl-icon slot=\"prefix\" name=\"book\"></sl-icon> My Library</a>\n        <a href=\"/books\" @click=\"", "\"> <sl-icon slot=\"prefix\" name=\"basket\"></sl-icon> Books</a>\n        ", "\n        <a href=\"#\" @click=\"", "\"> <sl-icon slot=\"prefix\" name=\"power\"></sl-icon> Sign Out</a>\n        \n      </nav>  \n    </sl-drawer>\n    "]);
-
-  _templateObject = function _templateObject() {
-    return data;
-  };
-
-  return data;
-}
 
 function _taggedTemplateLiteral(strings, raw) { if (!raw) { raw = strings.slice(0); } return Object.freeze(Object.defineProperties(strings, { raw: { value: Object.freeze(raw) } })); }
 
@@ -16409,52 +16840,34 @@ customElements.define('va-app-header', class AppHeader extends _litElement.LitEl
   }
 
   render() {
-    return (0, _litElement.html)(_templateObject(), this.hamburgerClick, this.title ? (0, _litElement.html)(_templateObject2(), this.title) : "", _Router.anchorRoute, this.user.accessLevel == 2 ? (0, _litElement.html)(_templateObject3(), _Router.anchorRoute) : (0, _litElement.html)(_templateObject4()), e => e.preventDefault(), this.user && this.user.avatar ? "".concat(_App.default.apiBase, "/images/").concat(this.user.avatar) : '', this.user && this.user.firstName, () => (0, _Router.gotoRoute)('/profile'), () => (0, _Router.gotoRoute)('/editProfile'), () => _Auth.default.signOut(), this.menuClick, this.menuClick, this.menuClick, this.menuClick, this.user.accessLevel == 2 ? (0, _litElement.html)(_templateObject5(), this.menuClick) : (0, _litElement.html)(_templateObject6()), () => _Auth.default.signOut());
+    return (0, _litElement.html)(_templateObject || (_templateObject = _taggedTemplateLiteral(["\n    <style>    \n   @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');  \n      * {\n        box-sizing: border-box;\n        font-family: 'Poppins', sans-serif;\n        margin: 0; \n        padding: 0; \n        scroll-padding-top: 2rem; \n        scroll-behavior: smooth; \n        box-sizing: border-box; \n        list-style: none; \n        text-decoration: none;\n      }\n\n      img{\n        width: 100%;\n      }\n      .app-header {\n        position: fixed;\n            top: 0;\n            right: 0;\n            left: 0;\n            height: var(--app-header-height);\n            color: #000;\n            display: flex;\n            z-index: 9;\n            align-items: center;\n      }\n      \n\n      .app-header-main {\n        flex-grow: 1;\n        display: flex;\n        align-items: center;\n      }\n\n      .app-header-main::slotted(h1){\n        color: #000;\n      }\n\n      .logo  {\n            display: inline-block;\n            padding: 1em;\n            width: 90px;\n\n          }\n      \n      .chevron-right-btn::part(base) {\n        color: #000;\n      }\n\n      \n@media screen and (min-width: 720px) {\n  .chevron-right-btn {\n    display: none;\n  }\n}\n\n      .app-top-nav {\n        display: flex;\n        height: 100%;\n        align-items: center;\n      }\n\n      .app-top-nav a {\n        display: inline-block;\n        padding: .8em;\n        text-decoration: none;\n        color: #000000;\n      }\n      \n      .app-side-menu-items a {\n        display: block;\n        padding: .5em;\n        text-decoration: none;\n        font-size: 1.3em;\n        color: #333;\n      }\n\n      .app-side-menu-logo {\n        width: 120px;\n        margin-bottom: 1em;\n        position: absolute;\n        top: 2em;\n        left: 1.5em;\n      }\n\n      .page-title {\n        color: var(--app-header-txt-color);\n        margin-right: 0.5em;\n        font-size: var(--app-header-title-font-size);\n      }\n\n      /* active nav links */\n      .app-top-nav a.active,\n      .app-side-menu-items a.active {\n        font-weight: bold;\n      }\n\n      /* RESPONSIVE - MOBILE ------------------- */\n      @media all and (max-width: 768px){       \n        \n        .app-top-nav {\n          display: none;\n        }\n      }\n\n\n\n\n    </style>\n\n    <header class=\"app-header\">\n      <sl-icon-button class=\"chevron-right-btn\" name=\"chevron-right\" @click=\"", "\" style=\"font-size: 1.5em;\"></sl-icon-button>       \n      <a href=\"/\"><img class=\"logo\" src=\"/images/logoblack.png\" /></a>\n      <div class=\"app-header-main\">\n        ", "\n        <slot></slot>\n      </div>\n\n      <nav class=\"app-top-nav\">\n        <a href=\"/\" @click=\"", "\">Home</a>  \n        ", "\n        <a href=\"/myLibrary\"> <sl-icon slot=\"prefix\" name=\"basket\"></sl-icon> Cart</a>\n        <a href=\"/artworks\"> <sl-icon slot=\"prefix\" name=\"brush\"></sl-icon> Artworks</a>  \n        <a href=\"/guide\"> <sl-icon slot=\"prefix\" name=\"book\"></sl-icon> Guide</a>  \n\n        <sl-dropdown>\n          <a slot=\"trigger\" href=\"#\" @click=\"", "\">\n            <sl-avatar style=\"--size: 24px;\" image=", "></sl-avatar> ", "\n          </a>\n          <sl-menu>            \n            <sl-menu-item @click=\"", "\">Profile</sl-menu-item>\n            <sl-menu-item @click=\"", "\">Edit Profile</sl-menu-item>\n            <sl-menu-item @click=\"", "\">Sign Out</sl-menu-item>\n          </sl-menu>\n        </sl-dropdown>\n      </nav>\n    </header>\n\n    <sl-drawer class=\"app-side-menu\" placement=\"left\">\n      <img class=\"app-side-menu-logo\" src=\"/images/logoblack.png\">\n      <nav class=\"app-side-menu-items\">\n        <a href=\"/\" @click=\"", "\"> <sl-icon slot=\"prefix\" name=\"house\"></sl-icon> Home</a>\n        <a href=\"/profile\" @click=\"", "\"> <sl-icon slot=\"prefix\" name=\"person\"></sl-icon> Profile</a>\n        <a href=\"/myLibrary\" @click=\"", "\"> <sl-icon slot=\"prefix\" name=\"basket\"></sl-icon> Cart</a>\n        <a href=\"/artworks\" @click=\"", "\"> <sl-icon slot=\"prefix\" name=\"brush\"></sl-icon> Artworks</a>\n        ", "\n        <a href=\"#\" @click=\"", "\"> <sl-icon slot=\"prefix\" name=\"power\"></sl-icon> Sign Out</a>\n        \n      </nav>  \n    </sl-drawer>\n\n    "])), this.hamburgerClick, this.title ? (0, _litElement.html)(_templateObject2 || (_templateObject2 = _taggedTemplateLiteral(["\n          <h1 class=\"page-title\">", "</h1>\n        "])), this.title) : "", _Router.anchorRoute, this.user.accessLevel == 2 ? (0, _litElement.html)(_templateObject3 || (_templateObject3 = _taggedTemplateLiteral(["\n        <a href=\"/newArtwork\" @click=\"", "\">Add Artwork</a> \n        "])), _Router.anchorRoute) : (0, _litElement.html)(_templateObject4 || (_templateObject4 = _taggedTemplateLiteral([""]))), e => e.preventDefault(), this.user && this.user.avatar ? "".concat(_App.default.apiBase, "/images/").concat(this.user.avatar) : '', this.user && this.user.firstName, () => (0, _Router.gotoRoute)('/profile'), () => (0, _Router.gotoRoute)('/editProfile'), () => _Auth.default.signOut(), this.menuClick, this.menuClick, this.menuClick, this.menuClick, this.user.accessLevel == 2 ? (0, _litElement.html)(_templateObject5 || (_templateObject5 = _taggedTemplateLiteral(["<a href=\"/newArtwork\" @click=\"", "\">Add Artwork</a> "])), this.menuClick) : (0, _litElement.html)(_templateObject6 || (_templateObject6 = _taggedTemplateLiteral([""]))), () => _Auth.default.signOut());
   }
 
 });
-},{"@polymer/lit-element":"../node_modules/@polymer/lit-element/lit-element.js","./../Router":"Router.js","./../Auth":"Auth.js","./../App":"App.js"}],"components/va-book.js":[function(require,module,exports) {
+},{"@polymer/lit-element":"../node_modules/@polymer/lit-element/lit-element.js","./../Router":"Router.js","./../Auth":"Auth.js","./../App":"App.js"}],"components/va-artwork.js":[function(require,module,exports) {
 "use strict";
 
 var _litElement = require("@polymer/lit-element");
 
 var _litHtml = require("lit-html");
 
-var _Router = require("./../Router");
+var _Router = require("../Router");
 
-var _Auth = _interopRequireDefault(require("./../Auth"));
+var _Auth = _interopRequireDefault(require("../Auth"));
 
-var _App = _interopRequireDefault(require("./../App"));
+var _App = _interopRequireDefault(require("../App"));
 
-var _UserAPI = _interopRequireDefault(require("./../UserAPI"));
+var _UserAPI = _interopRequireDefault(require("../UserAPI"));
 
-var _Toast = _interopRequireDefault(require("./../Toast"));
+var _Toast = _interopRequireDefault(require("../Toast"));
+
+var _templateObject, _templateObject2;
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-function _templateObject2() {
-  const data = _taggedTemplateLiteral(["\n    <style>\n     .author{\n         font-size:O.9em;\n         font-style: italic; \n         opacity: 0.8;\n     }\n    </style>\n\n    <sl-card>\n    <img slot=\"image\" src=\"", "/images/", "\" alt=\"", "\" />\n    <h2>", "</h2>\n    <h3 class= \"author\"> by ", "</h3>\n    <h4> Genre: ", "</h4>\n    <p>Description: <br><br> ", "</p>\n    <sl-button @click=", ">Read</sl-button>\n    <sl-icon-button name= \"plus-circle\" label=\"Add to Library\" @click=", "></sl-icon-button>\n    </sl-card>\n     \n    "]);
-
-  _templateObject2 = function _templateObject2() {
-    return data;
-  };
-
-  return data;
-}
-
-function _templateObject() {
-  const data = _taggedTemplateLiteral([" \n          <style>\n              .wrap {\n              display: flex;\n              }\n              .image {\n              width: 50%;\n              }\n              .image img {\n              width: 100%;\n              }\n              .content {\n              padding-left: 1em;\n              }\n              .author span,\n              .genre span,\n              .summary span{\n              text-transform: uppercase;\n              font-weight: bold;\n              color: var(--brand-color);\n              }\n\n        </style>\n        <div class=\"wrap\">\n             \n              <div class=\"content\">\n                  <h1>", "</h1>\n                  <p class=\"author\"> <span>Author: </span>", "</p>\n                  <p class=\"genre\"> <span> Genre: </span> ", " </p>\n                  <p class=\"summary\"> <span> Summary: </span> <br><br>", " </p>\n                  <sl-button @click=", " >\n                  <sl-icon slot=\"prefix\" name=\"plus-circle\"></sl-icon>\n                  Add to Library</sl-button>\n              </div>\n        </div> \n        "]);
-
-  _templateObject = function _templateObject() {
-    return data;
-  };
-
-  return data;
-}
-
 function _taggedTemplateLiteral(strings, raw) { if (!raw) { raw = strings.slice(0); } return Object.freeze(Object.defineProperties(strings, { raw: { value: Object.freeze(raw) } })); }
 
-customElements.define('va-book', class Book extends _litElement.LitElement {
+customElements.define('va-artwork', class Artwork extends _litElement.LitElement {
   constructor() {
     super();
   }
@@ -16473,7 +16886,7 @@ customElements.define('va-book', class Book extends _litElement.LitElement {
       image: {
         type: String
       },
-      description: {
+      price: {
         type: String
       },
       genre: {
@@ -16495,8 +16908,8 @@ customElements.define('va-book', class Book extends _litElement.LitElement {
 
   readHandler() {
     const dialogEl = document.createElement('sl-dialog');
-    dialogEl.className = 'book-dialog';
-    const dialogContent = (0, _litElement.html)(_templateObject(), this.name, this.author, this.genre, this.summary, this.addLibHandler.bind(this));
+    dialogEl.className = 'artwork-dialog';
+    const dialogContent = (0, _litElement.html)(_templateObject || (_templateObject = _taggedTemplateLiteral([" \n          <style>\n              .wrap {\n              display: flex;\n              }\n              .image {\n              width: 50%;\n              }\n              .image img {\n              width: 100%;\n              }\n              .content {\n              padding-left: 1em;\n              }\n              .author span,\n              .genre span,\n              .summary span{\n              text-transform: uppercase;\n              font-weight: bold;\n              color: var(--brand-color);\n              }\n\n        </style>\n        <div class=\"wrap\">\n             \n              <div class=\"content\">\n                  <h1>", "</h1>\n                  <p class=\"author\"> <span>Author: </span>", "</p>\n                  <p class=\"genre\"> <span> Genre: </span> ", " </p>\n                  <p class=\"summary\"> <span> Summary: </span> <br><br>", " </p>\n                  <sl-button @click=", " >\n                  <sl-icon slot=\"prefix\" name=\"plus-circle\"></sl-icon>\n                  Add to Library</sl-button>\n              </div>\n        </div> \n        "])), this.name, this.author, this.genre, this.summary, this.addLibHandler.bind(this));
     (0, _litHtml.render)(dialogContent, dialogEl);
     document.body.append(dialogEl);
     dialogEl.show();
@@ -16507,20 +16920,20 @@ customElements.define('va-book', class Book extends _litElement.LitElement {
 
   async addLibHandler() {
     try {
-      await _UserAPI.default.addBookLib(this.id);
+      await _UserAPI.default.addArtworkLib(this.id);
 
-      _Toast.default.show('Book added to myLibrary');
+      _Toast.default.show('Artwork added to Cart');
     } catch (err) {
       _Toast.default.show(err, 'error');
     }
   }
 
   render() {
-    return (0, _litElement.html)(_templateObject2(), _App.default.apiBase, this.image, this.name, this.name, this.author, this.genre, this.description, this.readHandler.bind(this), this.addLibHandler.bind(this));
+    return (0, _litElement.html)(_templateObject2 || (_templateObject2 = _taggedTemplateLiteral(["\n    <style>\n     .author{\n         font-size:O.9em;\n         font-style: italic; \n         opacity: 0.8;\n     }\n\n    .top-bar {\n      width: calc(100% - 40px);\n  position: absolute;\n  top: 0;\n  left: 0;\n  padding: 20px;\n  float: right;\n     }\n     \n   .img {\n    margin-top: 10%;\n  justify-content: bottom;\n  align-content: bottom;\n  text-align: center;\n}\n\n\n\n\n\n    </style>\n\n    <sl-card class=\"inn\">\n    <div class='img'>\n    <img src=\"", "/images/", "\" alt=\"", "\" style=\"width:400px;height:500px;\" />\n    </div>\n    <div class='top-bar'>\n    <span>", "</span>\n    </div>\n    <h3 class= \"author\"> by ", "</h3>\n    <h4> Genre: ", "</h4>\n    <p>$:  ", "</p>\n    <sl-icon-button name= \"cart\" label=\"Add to Library\" @click=", "></sl-icon-button>\n    </sl-card>\n     \n    "])), _App.default.apiBase, this.image, this.name, this.name, this.author, this.genre, this.price, this.addLibHandler.bind(this));
   }
 
 });
-},{"@polymer/lit-element":"../node_modules/@polymer/lit-element/lit-element.js","lit-html":"../node_modules/lit-html/lit-html.js","./../Router":"Router.js","./../Auth":"Auth.js","./../App":"App.js","./../UserAPI":"UserAPI.js","./../Toast":"Toast.js"}],"../node_modules/parcel-bundler/src/builtins/bundle-url.js":[function(require,module,exports) {
+},{"@polymer/lit-element":"../node_modules/@polymer/lit-element/lit-element.js","lit-html":"../node_modules/lit-html/lit-html.js","../Router":"Router.js","../Auth":"Auth.js","../App":"App.js","../UserAPI":"UserAPI.js","../Toast":"Toast.js"}],"../node_modules/parcel-bundler/src/builtins/bundle-url.js":[function(require,module,exports) {
 var bundleURL = null;
 
 function getBundleURLCached() {
@@ -16547,7 +16960,7 @@ function getBundleURL() {
 }
 
 function getBaseURL(url) {
-  return ('' + url).replace(/^((?:https?|file|ftp|chrome-extension|moz-extension):\/\/.+)\/[^/]+$/, '$1') + '/';
+  return ('' + url).replace(/^((?:https?|file|ftp|chrome-extension|moz-extension):\/\/.+)?\/[^/]+(?:\?.*)?$/, '$1') + '/';
 }
 
 exports.getBundleURL = getBundleURLCached;
@@ -16599,7 +17012,7 @@ var _App = _interopRequireDefault(require("./App.js"));
 
 require("./components/va-app-header");
 
-require("./components/va-book");
+require("./components/va-artwork");
 
 require("./scss/master.scss");
 
@@ -16611,7 +17024,7 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 document.addEventListener('DOMContentLoaded', () => {
   _App.default.init();
 });
-},{"./App.js":"App.js","./components/va-app-header":"components/va-app-header.js","./components/va-book":"components/va-book.js","./scss/master.scss":"scss/master.scss"}],"../node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
+},{"./App.js":"App.js","./components/va-app-header":"components/va-app-header.js","./components/va-artwork":"components/va-artwork.js","./scss/master.scss":"scss/master.scss"}],"../node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
 var global = arguments[3];
 var OVERLAY_ID = '__parcel__error__overlay__';
 var OldModule = module.bundle.Module;
@@ -16639,7 +17052,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "50122" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "56599" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};

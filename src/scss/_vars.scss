@@ -2,14 +2,14 @@
 
 :root {
   // base
-  --base-txt-color: #222;
-  --heading-color: #333;
+  --base-txt-color: rgb(223, 103, 103);
+  --heading-color: rgb(223, 103, 103);
   --base-font-family: 'Work Sans', sans-serif;
   --body-bg: #fff;
   
 
   // colors  
-  $brand-color: #FC8A28;
+  $brand-color: rgb(223, 103, 103);
   --brand-color: #{$brand-color};
   --link-color: --brand-color;
   
